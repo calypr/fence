@@ -383,7 +383,7 @@ class BlankIndex(object):
                 raise InternalError(
                     "fence not configured with data upload container; can't create signed URL"
                 )
-            container_url = "{}/{}/{}".format(container, self.guid, file_name)
+            container_url = "{}/{}".format(container, file_name)
 
             url = AzureBlobStorageIndexedFileLocation(container_url).get_signed_url(
                 "upload", expires_in
@@ -393,7 +393,7 @@ class BlankIndex(object):
                 bucket = flask.current_app.config["DATA_UPLOAD_BUCKET"]
 
             self.logger.debug("Attempting to upload to bucket '{}'".format(bucket))
-            s3_url = "s3://{}/{}/{}".format(bucket, self.guid, file_name)
+            s3_url = "s3://{}/{}".format(bucket, file_name)
             url = S3IndexedFileLocation(s3_url).get_signed_url("upload", expires_in)
 
         self.logger.info(
