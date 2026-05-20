@@ -26,6 +26,13 @@ class InternalError(APIError):
         self.code = 500
 
 
+class BadGatewayError(APIError):
+    def __init__(self, message):
+        super(BadGatewayError, self).__init__(message)
+        self.message = str(message)
+        self.code = 502
+
+
 class Unauthorized(APIError):
     """
     Used for AuthN-related errors in most cases.

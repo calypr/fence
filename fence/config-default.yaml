@@ -320,6 +320,7 @@ CLIENT_ALLOWED_SCOPES:
   - "openid"
   - "user"
   - "data"
+  - "github_credentials"
   - "google_credentials"
   - "google_service_account"
   - "google_link"
@@ -332,6 +333,7 @@ USER_ALLOWED_SCOPES:
   - "user"
   - "data"
   - "admin"
+  - "github_credentials"
   - "google_credentials"
   - "google_service_account"
   - "google_link"
@@ -350,6 +352,13 @@ SESSION_ALLOWED_SCOPES:
   - "google_service_account"
   - "google_link"
   - "ga4gh_passport_v1"
+
+GITHUB_APP:
+  app_id: ""
+  private_key: ""
+  private_key_file: ""
+  api_base_url: "https://api.github.com"
+  timeout_seconds: 10
 
 # this will error on authz callback from any of the above OIDC providers if the configured username field matches
 # the search regex provided below

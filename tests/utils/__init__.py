@@ -395,6 +395,7 @@ def authorized_download_credentials_context_claims(
         "user",
         "openid",
         "credentials",
+        "github_credentials",
         "google_link",
         "google_credentials",
     ]

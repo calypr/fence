@@ -181,6 +181,7 @@ CLIENT_ALLOWED_SCOPES:
   - "openid"
   - "user"
   - "data"
+  - "github_credentials"
   - "google_credentials"
   - "google_service_account"
   - "google_link"
@@ -192,6 +193,7 @@ USER_ALLOWED_SCOPES:
   - "user"
   - "data"
   - "admin"
+  - "github_credentials"
   - "google_credentials"
   - "google_service_account"
   - "google_link"
@@ -208,6 +210,16 @@ SESSION_ALLOWED_SCOPES:
   - "google_credentials"
   - "google_service_account"
   - "google_link"
+
+GITHUB_APP:
+  app_id: "12345"
+  private_key: |
+    -----BEGIN PRIVATE KEY-----
+    test-private-key
+    -----END PRIVATE KEY-----
+  private_key_file: ""
+  api_base_url: "https://api.github.example"
+  timeout_seconds: 10
 
 # //////////////////////////////////////////////////////////////////////////////////////
 # LOGIN

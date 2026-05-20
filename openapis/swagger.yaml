@@ -27,6 +27,8 @@ tags:
     description: Access credentials
   - name: credentials/google
     description: Google Credentials
+  - name: credentials/github
+    description: GitHub App installation tokens
   - name: credentials/cdis
     description: Deprecated! Use credentials/api
   - name: credentials/api
@@ -1017,6 +1019,40 @@ paths:
         '405':
           description: >-
             all param not provided and is required to explicitly delete all keys
+  /credentials/github/token:
+    post:
+      tags:
+        - credentials/github
+      summary: Mint GitHub App installation token
+      description: >-
+        Mint a short-lived GitHub App installation token for an authorized
+        repository. The caller must present a Fence bearer token with the
+        github_credentials scope and read access to the mapped program/project.
+      security:
+        - OAuth2:
+            - github_credentials
+      operationId: getGitHubInstallationToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GitHubInstallationTokenRequest'
+      responses:
+        '200':
+          description: GitHub installation token minted successfully
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/GitHubInstallationTokenResponse'
+        '401':
+          description: Missing or invalid bearer token
+        '403':
+          description: Caller is not authorized for the requested repository
+        '404':
+          description: GitHub App installation not found for the repository
+        '502':
+          description: GitHub upstream request failed
   '/credentials/google/{access_key}':
     delete:
       tags:
@@ -2307,6 +2343,44 @@ components:
             name: >-
               projects/example/serviceAccounts/example@example.iam.gserviceaccount.com/keys/1234567890abcdefghijklmnop
             validAfterTime: '2018-03-14T18:27:41Z'
+    GitHubInstallationTokenRequest:
+      type: object
+      required:
+        - owner
+        - repo
+      properties:
+        owner:
+          type: string
+          description: GitHub repository owner, mapped to the Gen3 program
+        repo:
+          type: string
+          description: GitHub repository name, mapped to the Gen3 project
+      example:
+        owner: HTAN_INT
+        repo: BForePC
+    GitHubInstallationTokenResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Short-lived GitHub App installation token
+        expires_at:
+          type: string
+          format: date-time
+          description: When the installation token expires
+        repository:
+          type: object
+          properties:
+            owner:
+              type: string
+            repo:
+              type: string
+      example:
+        token: ghs_example
+        expires_at: '2026-05-20T18:00:00Z'
+        repository:
+          owner: HTAN_INT
+          repo: BForePC
     APIKeys:
       type: object
       properties:

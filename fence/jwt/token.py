@@ -23,6 +23,7 @@ SCOPE_DESCRIPTION = {
     "user": "Know your {idp_names} basic account information and what you are authorized to access.",
     "data": "Retrieve controlled-access datasets to which you have access on your behalf.",
     "credentials": "View and update your credentials.",
+    "github_credentials": "Mint short-lived GitHub App installation tokens for authorized repositories.",
     "google_link": "Allow providing your personal Google account access to data on Google.",
     "google_credentials": "Receive temporary Google credentials to access data on Google.",
     "google_service_account": "Allow registration of external Google service accounts to access data.",
