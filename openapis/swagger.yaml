@@ -7,10 +7,7 @@ info:
   version: 0.1.0
   description: >-
     Access management for Gen3 data commons. Code is available on
-    [GitHub](https://github.com/uc-cdis/fence).
-  termsOfService: 'http://cdis.uchicago.edu/terms/'
-  contact:
-    email: cdis@uchicago.edu
+    [GitHub](https://github.com/calypr/fence).
   license:
     name: Apache 2.0
     url: 'http://www.apache.org/licenses/LICENSE-2.0.html'

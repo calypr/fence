@@ -1,84 +1,125 @@
-# To build: docker build -t fence:latest .
-# To run interactive:
-#   docker run -v ~/.gen3/fence/fence-config.yaml:/var/www/fence/fence-config.yaml -v ./keys/:/fence/keys/ fence:latest
-# To check running container do: docker exec -it CONTAINER bash
+# To build:
+#   docker build -t quay.io/<org>/fence:latest .
+# To run:
+#   docker run -p 80:80 \
+#     -v ~/.gen3/fence/fence-config.yaml:/var/www/fence/fence-config.yaml \
+#     -v ./keys:/fence/keys \
+#     quay.io/<org>/fence:latest
 
-ARG AZLINUX_BASE_VERSION=3.13-pythonnginx
+FROM python:3.13-slim AS builder
 
-# ------ Base stage ------
-FROM quay.io/cdis/amazonlinux-base:${AZLINUX_BASE_VERSION} AS base
-# Comment this in, and comment out the line above, if quay is down
-# FROM 707767160287.dkr.ecr.us-east-1.amazonaws.com/gen3/python-nginx-al:${AZLINUX_BASE_VERSION} as base
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    VENV_PATH=/opt/venv \
+    POETRY_VERSION=2.2.1
 
-ENV appname=fence
+WORKDIR /src
 
-WORKDIR /${appname}
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN chown -R gen3:gen3 /${appname}
+RUN python -m venv "${VENV_PATH}"
+ENV PATH="${VENV_PATH}/bin:${PATH}"
 
-USER root
-RUN chown -R gen3:gen3 /venv/
-USER gen3
-# ------ Builder stage ------
-FROM base AS builder
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir "poetry==${POETRY_VERSION}"
 
-USER gen3
+COPY poetry.lock pyproject.toml README.md /src/
+RUN poetry config virtualenvs.create false && \
+    poetry install --no-root --only main --no-interaction
 
-# copy ONLY poetry artifact, install the dependencies but not the app;
-# this will make sure that the dependencies are cached
-COPY poetry.lock pyproject.toml /${appname}/
-RUN poetry install -vv --no-root --only main --no-interaction
+COPY . /src
 
-# Move app files into working directory
-COPY --chown=gen3:gen3 . /$appname
-COPY --chown=gen3:gen3 ./deployment/wsgi/wsgi.py /$appname/wsgi.py
-
-# install the app
 RUN poetry install --without dev --no-interaction
 
-# Setup version info
-RUN git config --global --add safe.directory ${appname} && COMMIT=`git rev-parse HEAD` && echo "COMMIT=\"${COMMIT}\"" > $appname/version_data.py \
-    && VERSION=`git describe --always --tags` && echo "VERSION=\"${VERSION}\"" >> $appname/version_data.py
+ARG GITCOMMIT=unknown
+ARG GITVERSION=unknown
+RUN resolved_commit="$GITCOMMIT"; \
+    resolved_version="$GITVERSION"; \
+    if [ "$resolved_commit" = "unknown" ] && git rev-parse HEAD >/dev/null 2>&1; then \
+      resolved_commit="$(git rev-parse HEAD)"; \
+    fi; \
+    if [ "$resolved_version" = "unknown" ] && git describe --always --tags >/dev/null 2>&1; then \
+      resolved_version="$(git describe --always --tags)"; \
+    fi; \
+    printf 'COMMIT="%s"\nVERSION="%s"\n' "$resolved_commit" "$resolved_version" > /src/fence/version_data.py
 
+FROM python:3.13-slim
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:${PATH}" \
+    PROMETHEUS_MULTIPROC_DIR=/var/tmp/prometheus_metrics
 
-# ------ Final stage ------
-FROM base
+WORKDIR /fence
 
-# Import global virtualenv from builder
-COPY --from=builder /venv /venv
-ENV PATH="/venv/bin:$PATH"
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    ca-certificates \
+    ccrypt \
+    libpq5 \
+    nginx \
+    openssh-client \
+    tar \
+    tzdata \
+    && rm -rf /var/lib/apt/lists/*
 
-# FIXME: Remove this when it's in the base image
-ENV PROMETHEUS_MULTIPROC_DIR="/var/tmp/prometheus_metrics"
-RUN mkdir -p "${PROMETHEUS_MULTIPROC_DIR}" \
-    && chown gen3:gen3 "${PROMETHEUS_MULTIPROC_DIR}"
+RUN groupadd --system gen3 && \
+    useradd --system --gid gen3 --home-dir /fence --shell /usr/sbin/nologin gen3 && \
+    mkdir -p \
+      /fence/keys \
+      /run/nginx \
+      /var/lib/nginx \
+      /var/log/nginx \
+      /var/tmp/prometheus_metrics \
+      /var/www/fence && \
+    chown -R gen3:gen3 \
+      /fence \
+      /run/nginx \
+      /var/lib/nginx \
+      /var/log/nginx \
+      /var/tmp/prometheus_metrics \
+      /var/www/fence
 
-# Switching to root user to run dnf upgrades
-USER root
-# Install ccrypt to decrypt dbgap telmetry files
-RUN echo "Upgrading dnf"; \
-    dnf upgrade -y; \
-    echo "Installing Packages"; \
-    dnf install -y \
-        libxcrypt-compat-4.4.33 \
-        libpq-15.0 \
-        gcc \
-        diffutils \
-        tar xz; \
-    echo "Installing RPM"; \
-    rpm -i https://ccrypt.sourceforge.net/download/1.11/ccrypt-1.11-1.src.rpm && \
-    cd /root/rpmbuild/SOURCES/ && \
-    tar -zxf ccrypt-1.11.tar.gz && cd ccrypt-1.11 && ./configure --disable-libcrypt && make install && make check;
-RUN mkdir -p /var/www/fence && chown -R gen3:gen3 /var/www/fence
-# This `sed` command was previously executed in the usersync CronJob as it is required for DBGaP sync:
-# https://github.com/uc-cdis/gen3-helm/blob/e5f49978ac16364374252b8dfd9cfa28df4baf9a/helm/fence/templates/usersync-cron.yaml#L249C17-L249C192
-#
-# The logic has been moved into the Dockerfile because it requires root privileges,
-# while the usersync CronJob now runs as a non-root user.
-RUN sed -i 's/KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,/KexAlgorithms ecdh-sha2-nistp256,/g' /etc/crypto-policies/back-ends/openssh.config
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /src /fence
 
-USER gen3
-COPY --chown=gen3:gen3 --from=builder /$appname /$appname
+RUN printf '%s\n' \
+    'user gen3;' \
+    'worker_processes auto;' \
+    'pid /run/nginx.pid;' \
+    'events {' \
+    '    worker_connections 1024;' \
+    '}' \
+    'http {' \
+    '    include /etc/nginx/mime.types;' \
+    '    default_type application/octet-stream;' \
+    '    access_log /var/log/nginx/access.log;' \
+    '    error_log /var/log/nginx/error.log warn;' \
+    '    sendfile on;' \
+    '    tcp_nopush on;' \
+    '    keepalive_timeout 65;' \
+    '    server {' \
+    '        listen 80;' \
+    '        server_name _;' \
+    '        client_max_body_size 64m;' \
+    '        location / {' \
+    '            proxy_pass http://127.0.0.1:8000;' \
+    '            proxy_http_version 1.1;' \
+    '            proxy_set_header Host $host;' \
+    '            proxy_set_header X-Real-IP $remote_addr;' \
+    '            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;' \
+    '            proxy_set_header X-Forwarded-Proto $scheme;' \
+    '            proxy_set_header Connection "";' \
+    '        }' \
+    '    }' \
+    '}' \
+    > /etc/nginx/nginx.conf && \
+    ln -sf /dev/stdout /var/log/nginx/access.log && \
+    ln -sf /dev/stderr /var/log/nginx/error.log
 
-CMD ["/bin/bash", "-c", "/fence/dockerrun.bash"]
+EXPOSE 80
+CMD ["/bin/bash", "/fence/dockerrun.bash"]

@@ -1,9 +1,5 @@
 # Fence
 
-[![Build Status](https://travis-ci.org/uc-cdis/fence.svg?branch=master)](https://travis-ci.org/uc-cdis/fence)
-
-[![Coverage Status](https://coveralls.io/repos/github/uc-cdis/fence/badge.svg?branch=master)](https://coveralls.io/github/uc-cdis/fence?branch=master)
-
 A `fence` separates protected resources from the outside world and allows
 only trusted entities to enter.
 
@@ -40,7 +36,7 @@ At the moment, supported IDPs include:
 
 ### API Documentation
 
-[OpenAPI documentation available here.](http://petstore.swagger.io/?url=https://raw.githubusercontent.com/uc-cdis/fence/master/openapis/swagger.yaml)
+[OpenAPI documentation available here.](http://petstore.swagger.io/?url=https://raw.githubusercontent.com/calypr/fence/main/openapis/swagger.yaml)
 
 YAML file for the OpenAPI documentation is found in the `openapis` folder (in
 the root directory); see the README in that folder for more details.

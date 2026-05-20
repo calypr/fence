@@ -2,10 +2,10 @@
 name = "fence"
 version = "13.1.0"
 description = "Gen3 AuthN/AuthZ OIDC Service"
-authors = ["CTDS UChicago <cdis@uchicago.edu>"]
+authors = ["Calypr"]
 license = "Apache-2.0"
 readme = "README.md"
-repository = "https://github.com/uc-cdis/fence"
+repository = "https://github.com/calypr/fence"
 include = [
   "NOTICE",
 ]
