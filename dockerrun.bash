@@ -15,4 +15,4 @@ if [ -f /fence/jwt-keys.tar ]; then
 fi
 
 nginx
-exec gunicorn -c "/fence/deployment/wsgi/gunicorn.conf.py"
+exec /opt/venv/bin/python -m gunicorn -c "/fence/deployment/wsgi/gunicorn.conf.py"

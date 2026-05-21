@@ -10,8 +10,7 @@ FROM python:3.13-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    VENV_PATH=/opt/venv \
-    POETRY_VERSION=2.2.1
+    VENV_PATH=/opt/venv
 
 WORKDIR /src
 
@@ -24,16 +23,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python -m venv "${VENV_PATH}"
 ENV PATH="${VENV_PATH}/bin:${PATH}"
 
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir "poetry==${POETRY_VERSION}"
-
-COPY poetry.lock pyproject.toml README.md /src/
-RUN poetry config virtualenvs.create false && \
-    poetry install --no-root --only main --no-interaction
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 COPY . /src
 
-RUN poetry install --without dev --no-interaction
+RUN pip install --no-cache-dir .
+RUN /opt/venv/bin/python -m gunicorn --version >/dev/null
 
 ARG GITCOMMIT=unknown
 ARG GITVERSION=unknown
