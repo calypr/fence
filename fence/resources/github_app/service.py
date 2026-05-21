@@ -153,7 +153,7 @@ class GitHubAppService:
         now = datetime.now(UTC)
         payload = {
             "iat": int((now - timedelta(seconds=60)).timestamp()),
-            "exp": int((now + timedelta(minutes=10)).timestamp()),
+            "exp": int((now + timedelta(minutes=5)).timestamp()),
             "iss": self.config.app_id,
         }
         return jwt.encode(payload, self.config.private_key, algorithm="RS256")
