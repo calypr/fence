@@ -15,4 +15,4 @@ if [ -f /fence/jwt-keys.tar ]; then
 fi
 
 nginx
-exec poetry run gunicorn -c "/fence/deployment/wsgi/gunicorn.conf.py"
+exec gunicorn -c "/fence/deployment/wsgi/gunicorn.conf.py"
