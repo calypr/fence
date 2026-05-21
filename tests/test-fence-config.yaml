@@ -220,6 +220,7 @@ GITHUB_APP:
   private_key_file: ""
   api_base_url: "https://api.github.example"
   timeout_seconds: 10
+  install_url: "https://github.com/apps/calypr-github/installations/new"
 
 # //////////////////////////////////////////////////////////////////////////////////////
 # LOGIN

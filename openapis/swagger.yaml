@@ -1050,6 +1050,38 @@ paths:
           description: GitHub App installation not found for the repository
         '502':
           description: GitHub upstream request failed
+  /credentials/github/install-url:
+    post:
+      tags:
+        - credentials/github
+      summary: Build GitHub App installation URL
+      description: >-
+        Build a GitHub App installation URL for an authorized organization. The
+        caller must present a Fence bearer token with the github_credentials
+        scope and read access to the mapped program.
+      security:
+        - OAuth2:
+            - github_credentials
+      operationId: getGitHubInstallationURL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/GitHubInstallationURLRequest
+      responses:
+        200:
+          description: GitHub installation URL built successfully
+          content:
+            */*:
+              schema:
+                $ref: #/components/schemas/GitHubInstallationURLResponse
+        401:
+          description: Missing or invalid bearer token
+        403:
+          description: Caller is not authorized for the requested organization
+        502:
+          description: GitHub App install URL is not configured
   '/credentials/google/{access_key}':
     delete:
       tags:
@@ -2355,6 +2387,32 @@ components:
       example:
         owner: HTAN_INT
         repo: BForePC
+    GitHubInstallationURLRequest:
+      type: object
+      required:
+        - owner
+      properties:
+        owner:
+          type: string
+          description: GitHub organization owner, mapped to the Gen3 program
+        redirect_path:
+          type: string
+          description: Optional post-install redirect path encoded into the GitHub App state
+      example:
+        owner: HTAN_INT
+        redirect_path: /git/HTAN_INT
+    GitHubInstallationURLResponse:
+      type: object
+      properties:
+        install_url:
+          type: string
+          description: GitHub App installation URL
+        owner:
+          type: string
+          description: GitHub organization owner
+      example:
+        install_url: https://github.com/apps/calypr-github/installations/new?state=%2Fgit%2FHTAN_INT
+        owner: HTAN_INT
     GitHubInstallationTokenResponse:
       type: object
       properties:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import jwt
 import requests
@@ -24,6 +25,7 @@ class GitHubAppConfig:
     private_key: str
     api_base_url: str = DEFAULT_GITHUB_API_BASE_URL
     timeout_seconds: int = DEFAULT_GITHUB_TIMEOUT_SECONDS
+    install_url: str = ""
 
     @classmethod
     def from_config(cls, config):
@@ -70,11 +72,14 @@ class GitHubAppConfig:
         if timeout_seconds <= 0:
             raise UserError("GITHUB_APP.timeout_seconds must be greater than 0")
 
+        install_url = str(github_app_config.get("install_url", "")).strip()
+
         return cls(
             app_id=app_id,
             private_key=private_key,
             api_base_url=api_base_url.rstrip("/"),
             timeout_seconds=timeout_seconds,
+            install_url=install_url,
         )
 
 
@@ -86,6 +91,16 @@ class GitHubAppService:
     @classmethod
     def from_config(cls, config, session=None):
         return cls(GitHubAppConfig.from_config(config), session=session)
+
+    def build_installation_url(self, target_path: str):
+        install_url = self.config.install_url.strip()
+        if not install_url:
+            raise UnavailableError("GitHub App installation URL is not configured")
+
+        parsed_url = urlparse(install_url)
+        query = dict(parse_qsl(parsed_url.query, keep_blank_values=True))
+        query["state"] = target_path
+        return urlunparse(parsed_url._replace(query=urlencode(query)))
 
     def create_installation_token(self, owner: str, repo: str):
         installation = self._get_installation(owner, repo)

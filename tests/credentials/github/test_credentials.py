@@ -31,6 +31,21 @@ def test_github_app_config_requires_key_material(github_app_config):
         GitHubAppConfig.from_config({"GITHUB_APP": github_app_config})
 
 
+def test_github_install_url_requires_config(github_app_config):
+    github_app_config["install_url"] = ""
+    service = GitHubAppService(GitHubAppConfig.from_config({"GITHUB_APP": github_app_config}))
+    with pytest.raises(Exception) as exc:
+        service.build_installation_url("/git/HTAN_INT")
+    assert "installation URL is not configured" in str(exc.value)
+
+
+def test_github_install_url_appends_state(github_app_config):
+    github_app_config["install_url"] = "https://github.com/apps/calypr-github/installations/new"
+    service = GitHubAppService(GitHubAppConfig.from_config({"GITHUB_APP": github_app_config}))
+    install_url = service.build_installation_url("/git/HTAN_INT")
+    assert install_url == "https://github.com/apps/calypr-github/installations/new?state=%2Fgit%2FHTAN_INT"
+
+
 @responses.activate
 def test_github_installation_token_success(
     client, encoded_creds_jwt, mock_arborist_requests
@@ -63,6 +78,25 @@ def test_github_installation_token_success(
     }
 
 
+@responses.activate
+def test_github_installation_url_success(
+    client, encoded_creds_jwt, mock_arborist_requests
+):
+    mock_arborist_requests({"arborist/auth/request": {"POST": ({"auth": True}, 200)}})
+
+    response = client.post(
+        "/credentials/github/install-url",
+        json={"owner": "HTAN_INT", "redirect_path": "/git/HTAN_INT"},
+        headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json == {
+        "install_url": "https://github.com/apps/calypr-github/installations/new?state=%2Fgit%2FHTAN_INT",
+        "owner": "HTAN_INT",
+    }
+
+
 def test_github_installation_token_requires_authz(
     client, encoded_creds_jwt, mock_arborist_requests
 ):
@@ -77,9 +111,30 @@ def test_github_installation_token_requires_authz(
     assert response.status_code == 403
 
 
+def test_github_installation_url_requires_authz(
+    client, encoded_creds_jwt, mock_arborist_requests
+):
+    mock_arborist_requests({"arborist/auth/request": {"POST": ({"auth": False}, 200)}})
+
+    response = client.post(
+        "/credentials/github/install-url",
+        json={"owner": "HTAN_INT", "redirect_path": "/git/HTAN_INT"},
+        headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
+    )
+
+    assert response.status_code == 403
+
+
 def test_github_installation_token_requires_authorization(client):
     response = client.post(
         "/credentials/github/token", json={"owner": "HTAN_INT", "repo": "BForePC"}
+    )
+    assert response.status_code == 401
+
+
+def test_github_installation_url_requires_authorization(client):
+    response = client.post(
+        "/credentials/github/install-url", json={"owner": "HTAN_INT"}
     )
     assert response.status_code == 401
 
