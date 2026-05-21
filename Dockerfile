@@ -59,8 +59,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     ccrypt \
     libpq5 \
-    nginx \
     openssh-client \
+    openssl \
     tar \
     tzdata \
     && rm -rf /var/lib/apt/lists/*
@@ -69,54 +69,14 @@ RUN groupadd --system gen3 && \
     useradd --system --gid gen3 --home-dir /fence --shell /usr/sbin/nologin gen3 && \
     mkdir -p \
       /fence/keys \
-      /run/nginx \
-      /var/lib/nginx \
-      /var/log/nginx \
       /var/tmp/prometheus_metrics \
       /var/www/fence && \
     chown -R gen3:gen3 \
       /fence \
-      /run/nginx \
-      /var/lib/nginx \
-      /var/log/nginx \
       /var/tmp/prometheus_metrics \
       /var/www/fence
 
 COPY --from=builder /src /fence
-
-RUN printf '%s\n' \
-    'user gen3;' \
-    'worker_processes auto;' \
-    'pid /run/nginx.pid;' \
-    'events {' \
-    '    worker_connections 1024;' \
-    '}' \
-    'http {' \
-    '    include /etc/nginx/mime.types;' \
-    '    default_type application/octet-stream;' \
-    '    access_log /var/log/nginx/access.log;' \
-    '    error_log /var/log/nginx/error.log warn;' \
-    '    sendfile on;' \
-    '    tcp_nopush on;' \
-    '    keepalive_timeout 65;' \
-    '    server {' \
-    '        listen 80;' \
-    '        server_name _;' \
-    '        client_max_body_size 64m;' \
-    '        location / {' \
-    '            proxy_pass http://127.0.0.1:8000;' \
-    '            proxy_http_version 1.1;' \
-    '            proxy_set_header Host $host;' \
-    '            proxy_set_header X-Real-IP $remote_addr;' \
-    '            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;' \
-    '            proxy_set_header X-Forwarded-Proto $scheme;' \
-    '            proxy_set_header Connection "";' \
-    '        }' \
-    '    }' \
-    '}' \
-    > /etc/nginx/nginx.conf && \
-    ln -sf /dev/stdout /var/log/nginx/access.log && \
-    ln -sf /dev/stderr /var/log/nginx/error.log
 
 EXPOSE 80
 CMD ["/bin/bash", "/fence/dockerrun.bash"]
