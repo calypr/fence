@@ -10,7 +10,9 @@ FROM python:3.13-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    VENV_PATH=/opt/venv
+    POETRY_VERSION=2.2.1 \
+    POETRY_NO_INTERACTION=1 \
+    POETRY_VIRTUALENVS_IN_PROJECT=true
 
 WORKDIR /src
 
@@ -20,15 +22,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN python -m venv "${VENV_PATH}"
-ENV PATH="${VENV_PATH}/bin:${PATH}"
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir "poetry==${POETRY_VERSION}"
 
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+COPY poetry.lock pyproject.toml README.md /src/
+RUN poetry install --no-root --only main
 
 COPY . /src
 
-RUN pip install --no-cache-dir .
-RUN /opt/venv/bin/python -m gunicorn --version >/dev/null
+RUN poetry install --without dev
+RUN /src/.venv/bin/python -m gunicorn --version >/dev/null
 
 ARG GITCOMMIT=unknown
 ARG GITVERSION=unknown
@@ -46,7 +49,7 @@ FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/opt/venv/bin:${PATH}" \
+    PATH="/fence/.venv/bin:${PATH}" \
     PROMETHEUS_MULTIPROC_DIR=/var/tmp/prometheus_metrics
 
 WORKDIR /fence
@@ -79,7 +82,6 @@ RUN groupadd --system gen3 && \
       /var/tmp/prometheus_metrics \
       /var/www/fence
 
-COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /src /fence
 
 RUN printf '%s\n' \
