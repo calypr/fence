@@ -102,6 +102,44 @@ class GitHubAppService:
         query["state"] = target_path
         return urlunparse(parsed_url._replace(query=urlencode(query)))
 
+    def get_installation_status(self, owner: str, repo: str):
+        try:
+            installation = self._get_installation(owner, repo)
+        except NotFound:
+            return {
+                "installed": False,
+                "repository": {"owner": owner, "repo": repo},
+            }
+
+        return {
+            "installed": True,
+            "repository": {"owner": owner, "repo": repo},
+            "installation_id": installation.get("id"),
+            "target": (installation.get("account") or {}).get("login"),
+            "target_type": installation.get("target_type"),
+            "html_url": installation.get("html_url"),
+            "repository_selection": installation.get("repository_selection"),
+        }
+
+    def get_organization_installation(self, owner: str):
+        try:
+            installation = self._get_organization_installation(owner)
+        except NotFound:
+            return {
+                "installed": False,
+                "organization": owner,
+            }
+
+        return {
+            "installed": True,
+            "organization": owner,
+            "installation_id": installation.get("id"),
+            "target": (installation.get("account") or {}).get("login"),
+            "target_type": installation.get("target_type"),
+            "html_url": installation.get("html_url"),
+            "repository_selection": installation.get("repository_selection"),
+        }
+
     def create_installation_token(self, owner: str, repo: str):
         installation = self._get_installation(owner, repo)
         token_response = self._create_installation_access_token(installation["id"])
@@ -158,6 +196,9 @@ class GitHubAppService:
 
     def _get_installation(self, owner: str, repo: str):
         return self._github_request("GET", f"/repos/{owner}/{repo}/installation")
+
+    def _get_organization_installation(self, owner: str):
+        return self._github_request("GET", f"/orgs/{owner}/installation")
 
     def _create_installation_access_token(self, installation_id):
         return self._github_request(

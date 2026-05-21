@@ -1068,20 +1068,52 @@ paths:
         content:
           application/json:
             schema:
-              $ref: #/components/schemas/GitHubInstallationURLRequest
+              $ref: '#/components/schemas/GitHubInstallationURLRequest'
       responses:
-        200:
+        '200':
           description: GitHub installation URL built successfully
           content:
-            */*:
+            '*/*':
               schema:
-                $ref: #/components/schemas/GitHubInstallationURLResponse
-        401:
+                $ref: '#/components/schemas/GitHubInstallationURLResponse'
+        '401':
           description: Missing or invalid bearer token
-        403:
+        '403':
           description: Caller is not authorized for the requested organization
-        502:
+        '502':
           description: GitHub App install URL is not configured
+  /credentials/github/organization-installation:
+    post:
+      tags:
+        - credentials/github
+      summary: Get GitHub App organization installation status
+      description: >-
+        Return the GitHub App installation state for an authorized
+        organization. The caller must present a Fence bearer token with the
+        github_credentials scope and read access to the mapped program.
+      security:
+        - OAuth2:
+            - github_credentials
+      operationId: getGitHubOrganizationInstallationStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GitHubOrganizationInstallationRequest'
+      responses:
+        '200':
+          description: GitHub organization installation state returned successfully
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/GitHubOrganizationInstallationResponse'
+        '401':
+          description: Missing or invalid bearer token
+        '403':
+          description: Caller is not authorized for the requested organization
+        '502':
+          description: GitHub upstream request failed
   '/credentials/google/{access_key}':
     delete:
       tags:
@@ -2413,6 +2445,49 @@ components:
       example:
         install_url: https://github.com/apps/calypr-github/installations/new?state=%2Fgit%2FHTAN_INT
         owner: HTAN_INT
+    GitHubOrganizationInstallationRequest:
+      type: object
+      required:
+        - owner
+      properties:
+        owner:
+          type: string
+          description: GitHub organization owner, mapped to the Gen3 program
+      example:
+        owner: HTAN_INT
+    GitHubOrganizationInstallationResponse:
+      type: object
+      properties:
+        installed:
+          type: boolean
+          description: Whether the GitHub App is installed for the organization
+        organization:
+          type: string
+          description: GitHub organization owner
+        installation_id:
+          type: integer
+          format: int64
+          description: GitHub App installation id when installed
+        target:
+          type: string
+          description: Installation target login
+        target_type:
+          type: string
+          description: Installation target type
+        html_url:
+          type: string
+          description: GitHub installation settings URL
+        repository_selection:
+          type: string
+          description: Whether the installation covers all repositories or a selected set
+      example:
+        installed: true
+        organization: HTAN_INT
+        installation_id: 42
+        target: HTAN_INT
+        target_type: Organization
+        html_url: https://github.com/organizations/HTAN_INT/settings/installations/42
+        repository_selection: selected
     GitHubInstallationTokenResponse:
       type: object
       properties:

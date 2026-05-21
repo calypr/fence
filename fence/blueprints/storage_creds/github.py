@@ -41,7 +41,7 @@ def _authorize_organization(owner: str):
     )
     if not authorized:
         raise Forbidden(
-            "user does not have privileges to request a GitHub App installation URL for this organization"
+            "user does not have privileges to request GitHub App access for this organization"
         )
 
 
@@ -58,6 +58,21 @@ class GitHubInstallationToken(Resource):
 
         service = GitHubAppService.from_config(config)
         return flask.jsonify(service.create_installation_token(owner, repo))
+
+
+class GitHubInstallationStatus(Resource):
+    @require_auth_header({"github_credentials"})
+    def post(self):
+        payload = flask.request.get_json(silent=True) or {}
+        owner = str(payload.get("owner", "")).strip()
+        repo = str(payload.get("repo", "")).strip()
+        if not owner or not repo:
+            raise UserError("request body must include non-empty owner and repo")
+
+        _authorize_repository(owner, repo)
+
+        service = GitHubAppService.from_config(config)
+        return flask.jsonify(service.get_installation_status(owner, repo))
 
 
 class GitHubInstallationURL(Resource):
@@ -78,3 +93,17 @@ class GitHubInstallationURL(Resource):
                 "owner": owner,
             }
         )
+
+
+class GitHubOrganizationInstallationStatus(Resource):
+    @require_auth_header({"github_credentials"})
+    def post(self):
+        payload = flask.request.get_json(silent=True) or {}
+        owner = str(payload.get("owner", "")).strip()
+        if not owner:
+            raise UserError("request body must include non-empty owner")
+
+        _authorize_organization(owner)
+
+        service = GitHubAppService.from_config(config)
+        return flask.jsonify(service.get_organization_installation(owner))
