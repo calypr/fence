@@ -16,7 +16,12 @@ logger = get_logger(__name__)
 
 DEFAULT_GITHUB_API_BASE_URL = "https://api.github.com"
 DEFAULT_GITHUB_TIMEOUT_SECONDS = 10
-DEFAULT_GITHUB_PERMISSIONS = {"contents": "read", "metadata": "read"}
+DEFAULT_GITHUB_READ_PERMISSIONS = {"contents": "read", "metadata": "read"}
+DEFAULT_GITHUB_WRITE_PERMISSIONS = {
+    "contents": "write",
+    "metadata": "read",
+    "pull_requests": "write",
+}
 
 
 @dataclass(frozen=True)
@@ -140,9 +145,11 @@ class GitHubAppService:
             "repository_selection": installation.get("repository_selection"),
         }
 
-    def create_installation_token(self, owner: str, repo: str):
+    def create_installation_token(self, owner: str, repo: str, access: str = "read"):
         installation = self._get_installation(owner, repo)
-        token_response = self._create_installation_access_token(installation["id"])
+        token_response = self._create_installation_access_token(
+            installation["id"], access=access
+        )
         return {
             "token": token_response["token"],
             "expires_at": token_response["expires_at"],
@@ -200,9 +207,13 @@ class GitHubAppService:
     def _get_organization_installation(self, owner: str):
         return self._github_request("GET", f"/orgs/{owner}/installation")
 
-    def _create_installation_access_token(self, installation_id):
+    def _create_installation_access_token(self, installation_id, access: str = "read"):
+        if access == "write":
+            permissions = DEFAULT_GITHUB_WRITE_PERMISSIONS
+        else:
+            permissions = DEFAULT_GITHUB_READ_PERMISSIONS
         return self._github_request(
             "POST",
             f"/app/installations/{installation_id}/access_tokens",
-            json_body={"permissions": DEFAULT_GITHUB_PERMISSIONS},
+            json_body={"permissions": permissions},
         )

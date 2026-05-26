@@ -79,6 +79,47 @@ def test_github_installation_token_success(
 
 
 @responses.activate
+def test_github_installation_token_write_success(
+    client, encoded_creds_jwt, mock_arborist_requests
+):
+    mock_arborist_requests({"arborist/auth/request": {"POST": ({"auth": True}, 200)}})
+    responses.add(
+        responses.GET,
+        "https://api.github.example/repos/HTAN_INT/BForePC/installation",
+        json={"id": 42},
+        status=200,
+    )
+    responses.add(
+        responses.POST,
+        "https://api.github.example/app/installations/42/access_tokens",
+        match=[responses.matchers.json_params_matcher(
+            {
+                "permissions": {
+                    "contents": "write",
+                    "metadata": "read",
+                    "pull_requests": "write",
+                }
+            }
+        )],
+        json={"token": "ghs_write", "expires_at": "2026-05-20T18:00:00Z"},
+        status=201,
+    )
+
+    response = client.post(
+        "/credentials/github/token",
+        json={"owner": "HTAN_INT", "repo": "BForePC", "access": "write"},
+        headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json == {
+        "token": "ghs_write",
+        "expires_at": "2026-05-20T18:00:00Z",
+        "repository": {"owner": "HTAN_INT", "repo": "BForePC"},
+    }
+
+
+@responses.activate
 def test_github_installation_status_success(
     client, encoded_creds_jwt, mock_arborist_requests
 ):
@@ -248,6 +289,20 @@ def test_github_installation_token_requires_authz(
     assert response.status_code == 403
 
 
+def test_github_installation_token_write_requires_authz(
+    client, encoded_creds_jwt, mock_arborist_requests
+):
+    mock_arborist_requests({"arborist/auth/request": {"POST": ({"auth": False}, 200)}})
+
+    response = client.post(
+        "/credentials/github/token",
+        json={"owner": "HTAN_INT", "repo": "BForePC", "access": "write"},
+        headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
+    )
+
+    assert response.status_code == 403
+
+
 def test_github_installation_url_requires_authz(
     client, encoded_creds_jwt, mock_arborist_requests
 ):
@@ -267,6 +322,18 @@ def test_github_installation_token_requires_authorization(client):
         "/credentials/github/token", json={"owner": "HTAN_INT", "repo": "BForePC"}
     )
     assert response.status_code == 401
+
+
+def test_github_installation_token_rejects_invalid_access(
+    client, encoded_creds_jwt, mock_arborist_requests
+):
+    response = client.post(
+        "/credentials/github/token",
+        json={"owner": "HTAN_INT", "repo": "BForePC", "access": "admin"},
+        headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
+    )
+
+    assert response.status_code == 400
 
 
 def test_github_installation_status_requires_authorization(client):

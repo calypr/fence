@@ -7,20 +7,27 @@ from fence.errors import Forbidden, UserError
 from fence.resources.github_app import GitHubAppService
 
 
-def _authorize_repository(owner: str, repo: str):
+def _authorize_repository(owner: str, repo: str, access: str = "read"):
     if not hasattr(flask.current_app, "arborist"):
         raise Forbidden(
             "this fence instance is not configured with arborist; this endpoint is unavailable"
         )
 
     resource = f"/programs/{owner}/projects/{repo}"
+    methods = ["read"]
+    if access == "write":
+        methods = ["create", "write-storage"]
     authorized = flask.current_app.arborist.auth_request(
         jwt=get_jwt(),
         service="fence",
-        methods=["read"],
+        methods=methods,
         resources=[resource],
     )
     if not authorized:
+        if access == "write":
+            raise Forbidden(
+                "user does not have privileges to mint a write-capable GitHub token for this repository"
+            )
         raise Forbidden(
             "user does not have privileges to mint a GitHub token for this repository"
         )
@@ -51,13 +58,16 @@ class GitHubInstallationToken(Resource):
         payload = flask.request.get_json(silent=True) or {}
         owner = str(payload.get("owner", "")).strip()
         repo = str(payload.get("repo", "")).strip()
+        access = str(payload.get("access", "read")).strip().lower() or "read"
         if not owner or not repo:
             raise UserError("request body must include non-empty owner and repo")
+        if access not in {"read", "write"}:
+            raise UserError("request body access must be one of: read, write")
 
-        _authorize_repository(owner, repo)
+        _authorize_repository(owner, repo, access=access)
 
         service = GitHubAppService.from_config(config)
-        return flask.jsonify(service.create_installation_token(owner, repo))
+        return flask.jsonify(service.create_installation_token(owner, repo, access=access))
 
 
 class GitHubInstallationStatus(Resource):

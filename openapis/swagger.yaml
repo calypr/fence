@@ -1025,6 +1025,8 @@ paths:
         Mint a short-lived GitHub App installation token for an authorized
         repository. The caller must present a Fence bearer token with the
         github_credentials scope and read access to the mapped program/project.
+        Callers requesting write access must also have write authorization for
+        the mapped program/project.
       security:
         - OAuth2:
             - github_credentials
@@ -2416,9 +2418,17 @@ components:
         repo:
           type: string
           description: GitHub repository name, mapped to the Gen3 project
+        access:
+          type: string
+          description: Requested GitHub installation token capability
+          enum:
+            - read
+            - write
+          default: read
       example:
-        owner: HTAN_INT
-        repo: BForePC
+        owner: example-program
+        repo: example-project
+        access: read
     GitHubInstallationURLRequest:
       type: object
       required:
@@ -2431,8 +2441,8 @@ components:
           type: string
           description: Optional post-install redirect path encoded into the GitHub App state
       example:
-        owner: HTAN_INT
-        redirect_path: /git/HTAN_INT
+        owner: example-program
+        redirect_path: /git/example-program
     GitHubInstallationURLResponse:
       type: object
       properties:
@@ -2443,8 +2453,8 @@ components:
           type: string
           description: GitHub organization owner
       example:
-        install_url: https://github.com/apps/calypr-github/installations/new?state=%2Fgit%2FHTAN_INT
-        owner: HTAN_INT
+        install_url: https://github.com/apps/calypr-github/installations/new?state=%2Fgit%2Fexample-program
+        owner: example-program
     GitHubOrganizationInstallationRequest:
       type: object
       required:
@@ -2454,7 +2464,7 @@ components:
           type: string
           description: GitHub organization owner, mapped to the Gen3 program
       example:
-        owner: HTAN_INT
+        owner: example-program
     GitHubOrganizationInstallationResponse:
       type: object
       properties:
@@ -2482,11 +2492,11 @@ components:
           description: Whether the installation covers all repositories or a selected set
       example:
         installed: true
-        organization: HTAN_INT
+        organization: example-program
         installation_id: 42
-        target: HTAN_INT
+        target: example-program
         target_type: Organization
-        html_url: https://github.com/organizations/HTAN_INT/settings/installations/42
+        html_url: https://github.com/organizations/example-program/settings/installations/42
         repository_selection: selected
     GitHubInstallationTokenResponse:
       type: object
@@ -2509,8 +2519,8 @@ components:
         token: ghs_example
         expires_at: '2026-05-20T18:00:00Z'
         repository:
-          owner: HTAN_INT
-          repo: BForePC
+          owner: example-program
+          repo: example-project
     APIKeys:
       type: object
       properties:
