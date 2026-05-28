@@ -1016,104 +1016,46 @@ paths:
         '405':
           description: >-
             all param not provided and is required to explicitly delete all keys
-  /credentials/github/token:
+  /credentials/github:
     post:
       tags:
         - credentials/github
-      summary: Mint GitHub App installation token
+      summary: GitHub App credential broker
       description: >-
-        Mint a short-lived GitHub App installation token for an authorized
-        repository. The caller must present a Fence bearer token with the
-        github_credentials scope and read access to the mapped program/project.
-        Callers requesting write access must also have write authorization for
-        the mapped program/project.
+        Perform a GitHub App broker action. The caller must present a Fence
+        bearer token with the github_credentials scope. Repository token and
+        repository installation actions require access to the mapped
+        program/project. Organization installation and install URL actions
+        require access to the mapped program. Installation repository listing
+        returns repository metadata for a GitHub App installation id.
       security:
         - OAuth2:
             - github_credentials
-      operationId: getGitHubInstallationToken
+      operationId: brokerGitHubCredential
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GitHubInstallationTokenRequest'
+              $ref: '#/components/schemas/GitHubBrokerRequest'
       responses:
         '200':
-          description: GitHub installation token minted successfully
+          description: GitHub broker action completed successfully
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/GitHubInstallationTokenResponse'
+                oneOf:
+                  - $ref: '#/components/schemas/GitHubInstallationTokenResponse'
+                  - $ref: '#/components/schemas/GitHubInstallationURLResponse'
+                  - $ref: '#/components/schemas/GitHubOrganizationInstallationResponse'
+                  - $ref: '#/components/schemas/GitHubRepositoryInstallationResponse'
+                  - $ref: '#/components/schemas/GitHubInstallationRepositoriesResponse'
         '401':
           description: Missing or invalid bearer token
         '403':
-          description: Caller is not authorized for the requested repository
+          description: Caller is not authorized for the requested broker action
         '404':
-          description: GitHub App installation not found for the repository
-        '502':
-          description: GitHub upstream request failed
-  /credentials/github/install-url:
-    post:
-      tags:
-        - credentials/github
-      summary: Build GitHub App installation URL
-      description: >-
-        Build a GitHub App installation URL for an authorized organization. The
-        caller must present a Fence bearer token with the github_credentials
-        scope and read access to the mapped program.
-      security:
-        - OAuth2:
-            - github_credentials
-      operationId: getGitHubInstallationURL
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GitHubInstallationURLRequest'
-      responses:
-        '200':
-          description: GitHub installation URL built successfully
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/GitHubInstallationURLResponse'
-        '401':
-          description: Missing or invalid bearer token
-        '403':
-          description: Caller is not authorized for the requested organization
-        '502':
-          description: GitHub App install URL is not configured
-  /credentials/github/organization-installation:
-    post:
-      tags:
-        - credentials/github
-      summary: Get GitHub App organization installation status
-      description: >-
-        Return the GitHub App installation state for an authorized
-        organization. The caller must present a Fence bearer token with the
-        github_credentials scope and read access to the mapped program.
-      security:
-        - OAuth2:
-            - github_credentials
-      operationId: getGitHubOrganizationInstallationStatus
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GitHubOrganizationInstallationRequest'
-      responses:
-        '200':
-          description: GitHub organization installation state returned successfully
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/GitHubOrganizationInstallationResponse'
-        '401':
-          description: Missing or invalid bearer token
-        '403':
-          description: Caller is not authorized for the requested organization
+          description: GitHub App installation not found for the requested target
         '502':
           description: GitHub upstream request failed
   '/credentials/google/{access_key}':
@@ -2406,12 +2348,29 @@ components:
             name: >-
               projects/example/serviceAccounts/example@example.iam.gserviceaccount.com/keys/1234567890abcdefghijklmnop
             validAfterTime: '2018-03-14T18:27:41Z'
+    GitHubBrokerRequest:
+      oneOf:
+        - $ref: '#/components/schemas/GitHubInstallationTokenRequest'
+        - $ref: '#/components/schemas/GitHubInstallationURLRequest'
+        - $ref: '#/components/schemas/GitHubRepositoryInstallationRequest'
+        - $ref: '#/components/schemas/GitHubOrganizationInstallationRequest'
+        - $ref: '#/components/schemas/GitHubInstallationRepositoriesRequest'
+      discriminator:
+        propertyName: action
+      example:
+        action: installation_repositories
+        installation_id: 42
     GitHubInstallationTokenRequest:
       type: object
       required:
+        - action
         - owner
         - repo
       properties:
+        action:
+          type: string
+          enum:
+            - installation_token
         owner:
           type: string
           description: GitHub repository owner, mapped to the Gen3 program
@@ -2426,14 +2385,20 @@ components:
             - write
           default: read
       example:
+        action: installation_token
         owner: example-program
         repo: example-project
         access: read
     GitHubInstallationURLRequest:
       type: object
       required:
+        - action
         - owner
       properties:
+        action:
+          type: string
+          enum:
+            - install_url
         owner:
           type: string
           description: GitHub organization owner, mapped to the Gen3 program
@@ -2441,6 +2406,7 @@ components:
           type: string
           description: Optional post-install redirect path encoded into the GitHub App state
       example:
+        action: install_url
         owner: example-program
         redirect_path: /git/example-program
     GitHubInstallationURLResponse:
@@ -2455,16 +2421,60 @@ components:
       example:
         install_url: https://github.com/apps/calypr-github/installations/new?state=%2Fgit%2Fexample-program
         owner: example-program
+    GitHubRepositoryInstallationRequest:
+      type: object
+      required:
+        - action
+        - owner
+        - repo
+      properties:
+        action:
+          type: string
+          enum:
+            - repository_installation
+        owner:
+          type: string
+          description: GitHub repository owner, mapped to the Gen3 program
+        repo:
+          type: string
+          description: GitHub repository name, mapped to the Gen3 project
+      example:
+        action: repository_installation
+        owner: example-program
+        repo: example-project
     GitHubOrganizationInstallationRequest:
       type: object
       required:
+        - action
         - owner
       properties:
+        action:
+          type: string
+          enum:
+            - organization_installation
         owner:
           type: string
           description: GitHub organization owner, mapped to the Gen3 program
       example:
+        action: organization_installation
         owner: example-program
+    GitHubInstallationRepositoriesRequest:
+      type: object
+      required:
+        - action
+        - installation_id
+      properties:
+        action:
+          type: string
+          enum:
+            - installation_repositories
+        installation_id:
+          type: integer
+          format: int64
+          description: GitHub App installation id from the GitHub callback
+      example:
+        action: installation_repositories
+        installation_id: 42
     GitHubOrganizationInstallationResponse:
       type: object
       properties:
@@ -2498,6 +2508,76 @@ components:
         target_type: Organization
         html_url: https://github.com/organizations/example-program/settings/installations/42
         repository_selection: selected
+    GitHubRepositoryInstallationResponse:
+      type: object
+      properties:
+        installed:
+          type: boolean
+          description: Whether the GitHub App is installed for the repository
+        repository:
+          type: object
+          properties:
+            owner:
+              type: string
+            repo:
+              type: string
+        installation_id:
+          type: integer
+          format: int64
+          description: GitHub App installation id when installed
+        target:
+          type: string
+          description: Installation target login
+        target_type:
+          type: string
+          description: Installation target type
+        html_url:
+          type: string
+          description: GitHub installation settings URL
+        repository_selection:
+          type: string
+          description: Whether the installation covers all repositories or a selected set
+      example:
+        installed: true
+        repository:
+          owner: example-program
+          repo: example-project
+        installation_id: 42
+        target: example-program
+        target_type: Organization
+        html_url: https://github.com/organizations/example-program/settings/installations/42
+        repository_selection: selected
+    GitHubInstallationRepositoriesResponse:
+      type: object
+      properties:
+        installation_id:
+          type: integer
+          format: int64
+          description: GitHub App installation id
+        repositories:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                format: int64
+              name:
+                type: string
+              full_name:
+                type: string
+              html_url:
+                type: string
+              clone_url:
+                type: string
+      example:
+        installation_id: 42
+        repositories:
+          - id: 101
+            name: example-project
+            full_name: example-program/example-project
+            html_url: https://github.com/example-program/example-project
+            clone_url: https://github.com/example-program/example-project.git
     GitHubInstallationTokenResponse:
       type: object
       properties:

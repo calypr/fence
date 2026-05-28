@@ -65,8 +65,8 @@ def test_github_installation_token_success(
     )
 
     response = client.post(
-        "/credentials/github/token",
-        json={"owner": "HTAN_INT", "repo": "BForePC"},
+        "/credentials/github",
+        json={"action": "installation_token", "owner": "HTAN_INT", "repo": "BForePC"},
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
@@ -106,8 +106,13 @@ def test_github_installation_token_write_success(
     )
 
     response = client.post(
-        "/credentials/github/token",
-        json={"owner": "HTAN_INT", "repo": "BForePC", "access": "write"},
+        "/credentials/github",
+        json={
+            "action": "installation_token",
+            "owner": "HTAN_INT",
+            "repo": "BForePC",
+            "access": "write",
+        },
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
@@ -137,8 +142,12 @@ def test_github_installation_status_success(
     )
 
     response = client.post(
-        "/credentials/github/installation",
-        json={"owner": "HTAN_INT", "repo": "BForePC"},
+        "/credentials/github",
+        json={
+            "action": "repository_installation",
+            "owner": "HTAN_INT",
+            "repo": "BForePC",
+        },
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
@@ -167,8 +176,12 @@ def test_github_installation_status_not_found(
     )
 
     response = client.post(
-        "/credentials/github/installation",
-        json={"owner": "HTAN_INT", "repo": "BForePC"},
+        "/credentials/github",
+        json={
+            "action": "repository_installation",
+            "owner": "HTAN_INT",
+            "repo": "BForePC",
+        },
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
@@ -201,8 +214,8 @@ def test_github_organization_installation_success(
     )
 
     response = client.post(
-        "/credentials/github/organization-installation",
-        json={"owner": "HTAN_INT"},
+        "/credentials/github",
+        json={"action": "organization_installation", "owner": "HTAN_INT"},
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
@@ -231,8 +244,8 @@ def test_github_organization_installation_not_found(
     )
 
     response = client.post(
-        "/credentials/github/organization-installation",
-        json={"owner": "HTAN_INT"},
+        "/credentials/github",
+        json={"action": "organization_installation", "owner": "HTAN_INT"},
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
@@ -269,8 +282,8 @@ def test_github_installation_repositories_success(client, encoded_creds_jwt):
     )
 
     response = client.post(
-        "/credentials/github/installation-repositories",
-        json={"installation_id": 42},
+        "/credentials/github",
+        json={"action": "installation_repositories", "installation_id": 42},
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
@@ -291,7 +304,8 @@ def test_github_installation_repositories_success(client, encoded_creds_jwt):
 
 def test_github_installation_repositories_requires_authorization(client):
     response = client.post(
-        "/credentials/github/installation-repositories", json={"installation_id": 42}
+        "/credentials/github",
+        json={"action": "installation_repositories", "installation_id": 42},
     )
     assert response.status_code == 401
 
@@ -302,8 +316,8 @@ def test_github_organization_installation_requires_authz(
     mock_arborist_requests({"arborist/auth/request": {"POST": ({"auth": False}, 200)}})
 
     response = client.post(
-        "/credentials/github/organization-installation",
-        json={"owner": "HTAN_INT"},
+        "/credentials/github",
+        json={"action": "organization_installation", "owner": "HTAN_INT"},
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
@@ -316,8 +330,12 @@ def test_github_installation_url_success(
     mock_arborist_requests({"arborist/auth/request": {"POST": ({"auth": True}, 200)}})
 
     response = client.post(
-        "/credentials/github/install-url",
-        json={"owner": "HTAN_INT", "redirect_path": "/git/HTAN_INT"},
+        "/credentials/github",
+        json={
+            "action": "install_url",
+            "owner": "HTAN_INT",
+            "redirect_path": "/git/HTAN_INT",
+        },
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
@@ -334,8 +352,8 @@ def test_github_installation_token_requires_authz(
     mock_arborist_requests({"arborist/auth/request": {"POST": ({"auth": False}, 200)}})
 
     response = client.post(
-        "/credentials/github/token",
-        json={"owner": "HTAN_INT", "repo": "BForePC"},
+        "/credentials/github",
+        json={"action": "installation_token", "owner": "HTAN_INT", "repo": "BForePC"},
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
@@ -348,8 +366,13 @@ def test_github_installation_token_write_requires_authz(
     mock_arborist_requests({"arborist/auth/request": {"POST": ({"auth": False}, 200)}})
 
     response = client.post(
-        "/credentials/github/token",
-        json={"owner": "HTAN_INT", "repo": "BForePC", "access": "write"},
+        "/credentials/github",
+        json={
+            "action": "installation_token",
+            "owner": "HTAN_INT",
+            "repo": "BForePC",
+            "access": "write",
+        },
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
@@ -362,8 +385,12 @@ def test_github_installation_url_requires_authz(
     mock_arborist_requests({"arborist/auth/request": {"POST": ({"auth": False}, 200)}})
 
     response = client.post(
-        "/credentials/github/install-url",
-        json={"owner": "HTAN_INT", "redirect_path": "/git/HTAN_INT"},
+        "/credentials/github",
+        json={
+            "action": "install_url",
+            "owner": "HTAN_INT",
+            "redirect_path": "/git/HTAN_INT",
+        },
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
@@ -372,7 +399,8 @@ def test_github_installation_url_requires_authz(
 
 def test_github_installation_token_requires_authorization(client):
     response = client.post(
-        "/credentials/github/token", json={"owner": "HTAN_INT", "repo": "BForePC"}
+        "/credentials/github",
+        json={"action": "installation_token", "owner": "HTAN_INT", "repo": "BForePC"},
     )
     assert response.status_code == 401
 
@@ -381,8 +409,13 @@ def test_github_installation_token_rejects_invalid_access(
     client, encoded_creds_jwt, mock_arborist_requests
 ):
     response = client.post(
-        "/credentials/github/token",
-        json={"owner": "HTAN_INT", "repo": "BForePC", "access": "admin"},
+        "/credentials/github",
+        json={
+            "action": "installation_token",
+            "owner": "HTAN_INT",
+            "repo": "BForePC",
+            "access": "admin",
+        },
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
@@ -391,14 +424,19 @@ def test_github_installation_token_rejects_invalid_access(
 
 def test_github_installation_status_requires_authorization(client):
     response = client.post(
-        "/credentials/github/installation", json={"owner": "HTAN_INT", "repo": "BForePC"}
+        "/credentials/github",
+        json={
+            "action": "repository_installation",
+            "owner": "HTAN_INT",
+            "repo": "BForePC",
+        },
     )
     assert response.status_code == 401
 
 
 def test_github_installation_url_requires_authorization(client):
     response = client.post(
-        "/credentials/github/install-url", json={"owner": "HTAN_INT"}
+        "/credentials/github", json={"action": "install_url", "owner": "HTAN_INT"}
     )
     assert response.status_code == 401
 
@@ -416,8 +454,8 @@ def test_github_installation_token_not_found(
     )
 
     response = client.post(
-        "/credentials/github/token",
-        json={"owner": "HTAN_INT", "repo": "BForePC"},
+        "/credentials/github",
+        json={"action": "installation_token", "owner": "HTAN_INT", "repo": "BForePC"},
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
@@ -437,8 +475,8 @@ def test_github_installation_token_upstream_failure(
     )
 
     response = client.post(
-        "/credentials/github/token",
-        json={"owner": "HTAN_INT", "repo": "BForePC"},
+        "/credentials/github",
+        json={"action": "installation_token", "owner": "HTAN_INT", "repo": "BForePC"},
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
@@ -446,6 +484,7 @@ def test_github_installation_token_upstream_failure(
 
 def test_github_organization_installation_requires_authorization(client):
     response = client.post(
-        "/credentials/github/organization-installation", json={"owner": "HTAN_INT"}
+        "/credentials/github",
+        json={"action": "organization_installation", "owner": "HTAN_INT"},
     )
     assert response.status_code == 401
