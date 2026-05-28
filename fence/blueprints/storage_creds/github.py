@@ -117,3 +117,19 @@ class GitHubOrganizationInstallationStatus(Resource):
 
         service = GitHubAppService.from_config(config)
         return flask.jsonify(service.get_organization_installation(owner))
+
+
+class GitHubInstallationRepositories(Resource):
+    @require_auth_header({"github_credentials"})
+    def post(self):
+        payload = flask.request.get_json(silent=True) or {}
+        installation_id = payload.get("installation_id")
+        try:
+            installation_id = int(installation_id)
+        except (TypeError, ValueError):
+            raise UserError("request body must include a positive installation_id")
+        if installation_id <= 0:
+            raise UserError("request body must include a positive installation_id")
+
+        service = GitHubAppService.from_config(config)
+        return flask.jsonify(service.list_installation_repositories(installation_id))

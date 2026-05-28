@@ -243,6 +243,59 @@ def test_github_organization_installation_not_found(
     }
 
 
+@responses.activate
+def test_github_installation_repositories_success(client, encoded_creds_jwt):
+    responses.add(
+        responses.POST,
+        "https://api.github.example/app/installations/42/access_tokens",
+        json={"token": "ghs_installation", "expires_at": "2026-05-20T18:00:00Z"},
+        status=201,
+    )
+    responses.add(
+        responses.GET,
+        "https://api.github.example/installation/repositories?per_page=100&page=1",
+        json={
+            "repositories": [
+                {
+                    "id": 101,
+                    "name": "git_drs_test",
+                    "full_name": "Ellrott_Lab/git_drs_test",
+                    "html_url": "https://github.com/EllrottLab/git_drs_test",
+                    "clone_url": "https://github.com/EllrottLab/git_drs_test.git",
+                }
+            ]
+        },
+        status=200,
+    )
+
+    response = client.post(
+        "/credentials/github/installation-repositories",
+        json={"installation_id": 42},
+        headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json == {
+        "installation_id": 42,
+        "repositories": [
+            {
+                "id": 101,
+                "name": "git_drs_test",
+                "full_name": "Ellrott_Lab/git_drs_test",
+                "html_url": "https://github.com/EllrottLab/git_drs_test",
+                "clone_url": "https://github.com/EllrottLab/git_drs_test.git",
+            }
+        ],
+    }
+
+
+def test_github_installation_repositories_requires_authorization(client):
+    response = client.post(
+        "/credentials/github/installation-repositories", json={"installation_id": 42}
+    )
+    assert response.status_code == 401
+
+
 def test_github_organization_installation_requires_authz(
     client, encoded_creds_jwt, mock_arborist_requests
 ):

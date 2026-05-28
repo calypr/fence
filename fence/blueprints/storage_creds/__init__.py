@@ -4,6 +4,7 @@ from flask import current_app
 from fence.auth import require_auth_header
 from fence.blueprints.storage_creds.api import AccessKey, ApiKey, ApiKeyList
 from fence.blueprints.storage_creds.github import (
+    GitHubInstallationRepositories,
     GitHubInstallationStatus,
     GitHubInstallationToken,
     GitHubInstallationURL,
@@ -56,6 +57,11 @@ def make_creds_blueprint():
     blueprint_api.add_resource(
         GitHubOrganizationInstallationStatus,
         "/github/organization-installation",
+        strict_slashes=False,
+    )
+    blueprint_api.add_resource(
+        GitHubInstallationRepositories,
+        "/github/installation-repositories",
         strict_slashes=False,
     )
 

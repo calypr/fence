@@ -156,6 +156,40 @@ class GitHubAppService:
             "repository": {"owner": owner, "repo": repo},
         }
 
+    def list_installation_repositories(self, installation_id):
+        token_response = self._create_installation_access_token(
+            installation_id, access="read"
+        )
+        token = token_response["token"]
+        repositories = []
+        page = 1
+        per_page = 100
+        while True:
+            payload = self._installation_token_request(
+                "GET",
+                f"/installation/repositories?per_page={per_page}&page={page}",
+                token,
+            )
+            page_repositories = payload.get("repositories") or []
+            for repository in page_repositories:
+                repositories.append(
+                    {
+                        "id": repository.get("id"),
+                        "name": repository.get("name"),
+                        "full_name": repository.get("full_name"),
+                        "html_url": repository.get("html_url"),
+                        "clone_url": repository.get("clone_url"),
+                    }
+                )
+            if len(page_repositories) < per_page:
+                break
+            page += 1
+
+        return {
+            "installation_id": int(installation_id),
+            "repositories": repositories,
+        }
+
     def _app_jwt(self):
         now = datetime.now(UTC)
         payload = {
@@ -194,6 +228,39 @@ class GitHubAppService:
             )
             raise BadGatewayError(
                 f"GitHub App request failed with status {response.status_code}"
+            )
+
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise BadGatewayError(f"invalid JSON returned from GitHub: {exc}")
+
+    def _installation_token_request(self, method: str, path: str, token: str):
+        url = f"{self.config.api_base_url}{path}"
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+        }
+        try:
+            response = self.session.request(
+                method,
+                url,
+                headers=headers,
+                timeout=self.config.timeout_seconds,
+            )
+        except requests.RequestException as exc:
+            raise BadGatewayError(f"GitHub installation request failed: {exc}")
+
+        if response.status_code >= 400:
+            logger.error(
+                "GitHub installation request failed with status %s for %s %s: %s",
+                response.status_code,
+                method,
+                url,
+                response.text,
+            )
+            raise BadGatewayError(
+                f"GitHub installation request failed with status {response.status_code}"
             )
 
         try:
