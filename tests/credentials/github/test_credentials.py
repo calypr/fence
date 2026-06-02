@@ -346,6 +346,32 @@ def test_github_installation_url_success(
     }
 
 
+def test_github_installation_url_allows_org_member_create_descendant(
+    client, encoded_creds_jwt, app, monkeypatch
+):
+    def auth_request(*, service, methods, resources, **kwargs):
+        assert service == "arborist"
+        return methods == ["create-descendant"] and resources == ["/programs/HTAN_INT/projects"]
+
+    monkeypatch.setattr(app.arborist, "auth_request", auth_request)
+
+    response = client.post(
+        "/credentials/github",
+        json={
+            "action": "install_url",
+            "owner": "HTAN_INT",
+            "redirect_path": "/git/HTAN_INT",
+        },
+        headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json == {
+        "install_url": "https://github.com/apps/calypr-github/installations/new?state=%2Fgit%2FHTAN_INT",
+        "owner": "HTAN_INT",
+    }
+
+
 def test_github_installation_token_requires_authz(
     client, encoded_creds_jwt, mock_arborist_requests
 ):
@@ -358,6 +384,36 @@ def test_github_installation_token_requires_authz(
     )
 
     assert response.status_code == 403
+
+
+def test_github_installation_token_uses_calypr_organization_for_authz(
+    client, encoded_creds_jwt, app, monkeypatch
+):
+    def auth_request(*, service, methods, resources, **kwargs):
+        assert service == "fence"
+        assert methods == ["read"]
+        assert resources == ["/programs/Ellrott_Lab/projects/test_project_creation"]
+        return True
+
+    monkeypatch.setattr(app.arborist, "auth_request", auth_request)
+    monkeypatch.setattr(
+        GitHubAppService,
+        "get_installation_status",
+        lambda self, owner, repo: {"installed": True, "repository": {"owner": owner, "repo": repo}},
+    )
+
+    response = client.post(
+        "/credentials/github",
+        json={
+            "action": "repository_installation",
+            "owner": "EllrottLab",
+            "organization": "Ellrott_Lab",
+            "repo": "test_project_creation",
+        },
+        headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
+    )
+
+    assert response.status_code == 200
 
 
 def test_github_installation_token_write_requires_authz(

@@ -7,13 +7,16 @@ from fence.errors import Forbidden, UserError
 from fence.resources.github_app import GitHubAppService
 
 
-def _authorize_repository(owner: str, repo: str, access: str = "read"):
+def _authorize_repository(
+    owner: str, repo: str, organization: str = "", access: str = "read"
+):
     if not hasattr(flask.current_app, "arborist"):
         raise Forbidden(
             "this fence instance is not configured with arborist; this endpoint is unavailable"
         )
 
-    resource = f"/programs/{owner}/projects/{repo}"
+    calypr_org = organization.strip() or owner
+    resource = f"/programs/{calypr_org}/projects/{repo}"
     methods = ["read"]
     if access == "write":
         methods = ["create", "write-storage"]
@@ -39,14 +42,14 @@ def _authorize_organization(owner: str):
             "this fence instance is not configured with arborist; this endpoint is unavailable"
         )
 
-    resource = f"/programs/{owner}"
-    authorized = flask.current_app.arborist.auth_request(
+    project_container_resource = f"/programs/{owner}/projects"
+    allowed = flask.current_app.arborist.auth_request(
         jwt=get_jwt(),
-        service="fence",
-        methods=["read"],
-        resources=[resource],
+        service="arborist",
+        methods=["create-descendant"],
+        resources=[project_container_resource],
     )
-    if not authorized:
+    if not allowed:
         raise Forbidden(
             "user does not have privileges to request GitHub App access for this organization"
         )
@@ -62,20 +65,22 @@ class GitHubCredentialBroker(Resource):
         if action == "installation_token":
             owner = str(payload.get("owner", "")).strip()
             repo = str(payload.get("repo", "")).strip()
+            organization = str(payload.get("organization", "")).strip()
             access = str(payload.get("access", "read")).strip().lower() or "read"
             if not owner or not repo:
                 raise UserError("request body must include non-empty owner and repo")
             if access not in {"read", "write"}:
                 raise UserError("request body access must be one of: read, write")
-            _authorize_repository(owner, repo, access=access)
+            _authorize_repository(owner, repo, organization=organization, access=access)
             return flask.jsonify(service.create_installation_token(owner, repo, access=access))
 
         if action == "repository_installation":
             owner = str(payload.get("owner", "")).strip()
             repo = str(payload.get("repo", "")).strip()
+            organization = str(payload.get("organization", "")).strip()
             if not owner or not repo:
                 raise UserError("request body must include non-empty owner and repo")
-            _authorize_repository(owner, repo)
+            _authorize_repository(owner, repo, organization=organization)
             return flask.jsonify(service.get_installation_status(owner, repo))
 
         if action == "install_url":
