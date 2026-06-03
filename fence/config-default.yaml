@@ -839,6 +839,10 @@ ARBORIST: 'http://arborist-service'
 
 # time in seconds to wait for arborist to respond to requests from fence
 ARBORIST_TIMEOUT: 30
+# shared authz snapshot cache for /user/user responses; use Redis so all Fence pods share freshness-aware cache entries
+AUTHZ_SNAPSHOT_CACHE_ENABLED: true
+AUTHZ_SNAPSHOT_CACHE_REDIS_URL: ''
+AUTHZ_SNAPSHOT_CACHE_TTL_SECONDS: 3600
 # url where the audit-service is running
 AUDIT_SERVICE: 'http://audit-service'
 ENABLE_AUDIT_LOGS:

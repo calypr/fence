@@ -19,6 +19,7 @@ from fence.resources.google.utils import (
     get_linked_google_account_exp,
     get_service_account,
 )
+from fence.resources.user.authz_snapshot_cache import get_authz_snapshot
 from fence.resources.userdatamodel import get_user_groups
 
 from fence.config import config
@@ -121,15 +122,20 @@ def get_user_info(current_session, username):
     info["primary_google_service_account"] = primary_service_account_email
 
     try:
-        auth_mapping = (
-            flask.current_app.arborist.auth_mapping(user.username)
+        resources, auth_mapping = (
+            get_authz_snapshot(user.username)
             if flask.current_app.arborist
-            else {}
+            else ([], {})
         )
-        resources = list(auth_mapping.keys())
     except ArboristError as exc:
         logger.error(
             f"request to arborist for user's resources failed; going to list empty. Error: {exc}"
+        )
+        resources = []
+        auth_mapping = {}
+    except Exception as exc:
+        logger.error(
+            f"request to arborist for user's auth snapshot failed; going to list empty. Error: {exc}"
         )
         resources = []
         auth_mapping = {}
