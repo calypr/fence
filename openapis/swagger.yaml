@@ -2401,13 +2401,17 @@ components:
             - install_url
         owner:
           type: string
-          description: GitHub organization owner, mapped to the Gen3 program
+          description: GitHub organization owner/login used for GitHub App install flow bookkeeping
+        organization:
+          type: string
+          description: Optional Calypr organization slug used for Arborist authorization; defaults to owner
         redirect_path:
           type: string
           description: Optional post-install redirect path encoded into the GitHub App state
       example:
         action: install_url
-        owner: example-program
+        owner: example-github-org
+        organization: example-program
         redirect_path: /git/example-program
     GitHubInstallationURLResponse:
       type: object
@@ -2417,10 +2421,14 @@ components:
           description: GitHub App installation URL
         owner:
           type: string
-          description: GitHub organization owner
+          description: GitHub organization owner/login
+        organization:
+          type: string
+          description: Calypr organization slug used for authorization
       example:
         install_url: https://github.com/apps/calypr-github/installations/new?state=%2Fgit%2Fexample-program
-        owner: example-program
+        owner: example-github-org
+        organization: example-program
     GitHubRepositoryInstallationRequest:
       type: object
       required:
@@ -2454,10 +2462,14 @@ components:
             - organization_installation
         owner:
           type: string
-          description: GitHub organization owner, mapped to the Gen3 program
+          description: GitHub organization owner/login queried against the GitHub App API
+        organization:
+          type: string
+          description: Optional Calypr organization slug used for Arborist authorization; defaults to owner
       example:
         action: organization_installation
-        owner: example-program
+        owner: example-github-org
+        organization: example-program
     GitHubInstallationRepositoriesRequest:
       type: object
       required:

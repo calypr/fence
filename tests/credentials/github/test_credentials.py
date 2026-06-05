@@ -202,31 +202,35 @@ def test_github_organization_installation_success(
     mock_arborist_requests({"arborist/auth/request": {"POST": ({"auth": True}, 200)}})
     responses.add(
         responses.GET,
-        "https://api.github.example/orgs/HTAN_INT/installation",
+        "https://api.github.example/orgs/EllrottLab/installation",
         json={
             "id": 42,
             "target_type": "Organization",
             "repository_selection": "selected",
-            "html_url": "https://github.com/organizations/HTAN_INT/settings/installations/42",
-            "account": {"login": "HTAN_INT"},
+            "html_url": "https://github.com/organizations/EllrottLab/settings/installations/42",
+            "account": {"login": "EllrottLab"},
         },
         status=200,
     )
 
     response = client.post(
         "/credentials/github",
-        json={"action": "organization_installation", "owner": "HTAN_INT"},
+        json={
+            "action": "organization_installation",
+            "owner": "EllrottLab",
+            "organization": "Ellrott_Lab",
+        },
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
     assert response.status_code == 200
     assert response.json == {
         "installed": True,
-        "organization": "HTAN_INT",
+        "organization": "EllrottLab",
         "installation_id": 42,
-        "target": "HTAN_INT",
+        "target": "EllrottLab",
         "target_type": "Organization",
-        "html_url": "https://github.com/organizations/HTAN_INT/settings/installations/42",
+        "html_url": "https://github.com/organizations/EllrottLab/settings/installations/42",
         "repository_selection": "selected",
     }
 
@@ -238,21 +242,25 @@ def test_github_organization_installation_not_found(
     mock_arborist_requests({"arborist/auth/request": {"POST": ({"auth": True}, 200)}})
     responses.add(
         responses.GET,
-        "https://api.github.example/orgs/HTAN_INT/installation",
+        "https://api.github.example/orgs/EllrottLab/installation",
         json={"message": "Not Found"},
         status=404,
     )
 
     response = client.post(
         "/credentials/github",
-        json={"action": "organization_installation", "owner": "HTAN_INT"},
+        json={
+            "action": "organization_installation",
+            "owner": "EllrottLab",
+            "organization": "Ellrott_Lab",
+        },
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
     assert response.status_code == 200
     assert response.json == {
         "installed": False,
-        "organization": "HTAN_INT",
+        "organization": "EllrottLab",
     }
 
 
@@ -317,7 +325,11 @@ def test_github_organization_installation_requires_authz(
 
     response = client.post(
         "/credentials/github",
-        json={"action": "organization_installation", "owner": "HTAN_INT"},
+        json={
+            "action": "organization_installation",
+            "owner": "EllrottLab",
+            "organization": "Ellrott_Lab",
+        },
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
@@ -333,16 +345,18 @@ def test_github_installation_url_success(
         "/credentials/github",
         json={
             "action": "install_url",
-            "owner": "HTAN_INT",
-            "redirect_path": "/git/HTAN_INT",
+            "owner": "EllrottLab",
+            "organization": "Ellrott_Lab",
+            "redirect_path": "/git/Ellrott_Lab",
         },
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
     assert response.status_code == 200
     assert response.json == {
-        "install_url": "https://github.com/apps/calypr-github/installations/new?state=%2Fgit%2FHTAN_INT",
-        "owner": "HTAN_INT",
+        "install_url": "https://github.com/apps/calypr-github/installations/new?state=%2Fgit%2FEllrott_Lab",
+        "owner": "EllrottLab",
+        "organization": "Ellrott_Lab",
     }
 
 
@@ -351,7 +365,7 @@ def test_github_installation_url_allows_org_member_create_descendant(
 ):
     def auth_request(*, service, methods, resources, **kwargs):
         assert service == "arborist"
-        return methods == ["create-descendant"] and resources == ["/programs/HTAN_INT/projects"]
+        return methods == ["create-descendant"] and resources == ["/programs/Ellrott_Lab/projects"]
 
     monkeypatch.setattr(app.arborist, "auth_request", auth_request)
 
@@ -359,16 +373,18 @@ def test_github_installation_url_allows_org_member_create_descendant(
         "/credentials/github",
         json={
             "action": "install_url",
-            "owner": "HTAN_INT",
-            "redirect_path": "/git/HTAN_INT",
+            "owner": "EllrottLab",
+            "organization": "Ellrott_Lab",
+            "redirect_path": "/git/Ellrott_Lab",
         },
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
     assert response.status_code == 200
     assert response.json == {
-        "install_url": "https://github.com/apps/calypr-github/installations/new?state=%2Fgit%2FHTAN_INT",
-        "owner": "HTAN_INT",
+        "install_url": "https://github.com/apps/calypr-github/installations/new?state=%2Fgit%2FEllrott_Lab",
+        "owner": "EllrottLab",
+        "organization": "Ellrott_Lab",
     }
 
 
@@ -386,13 +402,13 @@ def test_github_installation_token_requires_authz(
     assert response.status_code == 403
 
 
-def test_github_installation_token_uses_calypr_organization_for_authz(
+def test_github_installation_token_uses_calypr_project_for_authz(
     client, encoded_creds_jwt, app, monkeypatch
 ):
     def auth_request(*, service, methods, resources, **kwargs):
         assert service == "fence"
         assert methods == ["read"]
-        assert resources == ["/programs/Ellrott_Lab/projects/test_project_creation"]
+        assert resources == ["/programs/Ellrott_Lab/projects/test"]
         return True
 
     monkeypatch.setattr(app.arborist, "auth_request", auth_request)
@@ -409,6 +425,7 @@ def test_github_installation_token_uses_calypr_organization_for_authz(
             "owner": "EllrottLab",
             "organization": "Ellrott_Lab",
             "repo": "test_project_creation",
+            "project": "test",
         },
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )

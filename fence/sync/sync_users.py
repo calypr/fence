@@ -161,8 +161,28 @@ class UserYAML(object):
         if filepath:
             with _read_file(filepath, encrypted=encrypted, key=key, logger=logger) as f:
                 file_contents = f.read()
-                validate_user_yaml(file_contents)  # run user.yaml validation tests
                 data = yaml.safe_load(file_contents)
+                if data is None:
+                    data = {}
+
+                # Fence historically requires users listed in authz groups to also appear
+                # in the top-level `users` block because sync_users derives DB user records
+                # from that block. Synthesize empty user entries for group-only users so
+                # authz group membership can stand on its own.
+                authz = data.get("authz", {}) or {}
+                authz_groups = authz.get("groups", []) or []
+                users = data.get("users", {}) or {}
+                synthesized_user = False
+                for group in authz_groups:
+                    for username in group.get("users", []) or []:
+                        if username not in users:
+                            users[username] = {}
+                            synthesized_user = True
+                if synthesized_user:
+                    data["users"] = users
+                    file_contents = yaml.safe_dump(data, sort_keys=False)
+
+                validate_user_yaml(file_contents)  # run user.yaml validation tests
         else:
             if logger:
                 logger.info("Did not sync a user.yaml, no file path provided.")
