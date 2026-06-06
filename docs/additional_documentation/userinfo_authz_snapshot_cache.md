@@ -200,6 +200,15 @@ At a high level:
 - `installation_repositories`
   - lists repositories visible to an installation
 
+Recent branch detail:
+
+- the org-oriented actions accept both a GitHub `owner` and an optional Calypr
+  `organization` slug
+- when `organization` is omitted, Fence falls back to `owner` for Arborist
+  authorization
+- `installation_repositories` is keyed by `installation_id`, which is meant to
+  come from an earlier installation-status or callback-derived flow
+
 ### GitHub broker sequence
 
 ```mermaid
@@ -228,6 +237,17 @@ sequenceDiagram
         Fence-->>Client: 403 forbidden
     end
 ```
+
+For the org install-link flow, the request shape is slightly different:
+
+- `install_url`
+  - `owner` is the GitHub org login
+  - `organization` is the optional Calypr org slug used for Arborist auth
+  - `redirect_path` is encoded into the GitHub App `state`
+- `organization_installation`
+  - uses the same `owner` plus optional `organization` split
+- `installation_repositories`
+  - takes `installation_id` and returns repository metadata for that install
 
 ### Arborist authorization model
 
@@ -278,6 +298,12 @@ The service can:
 - enumerate installation repositories with
   `GET /installation/repositories`
 
+Installation status responses can also include:
+
+- `repository_selection`
+  - whether the GitHub App install covers all repositories or only a selected
+    subset
+
 ### Configuration
 
 Config lives in
@@ -288,14 +314,22 @@ Relevant settings:
 - `GITHUB_APP.app_id`
 - `GITHUB_APP.private_key`
 - `GITHUB_APP.private_key_file`
+- `GITHUB_APP.install_url`
 - `GITHUB_APP.api_base_url`
   - default: `https://api.github.com`
 - `GITHUB_APP.timeout_seconds`
   - default: `10`
 
-`GitHubAppService` also supports `GITHUB_APP.install_url`, which is consumed by
-the service layer even though it is not currently listed in the default config
-block. That URL is used to build the GitHub App install flow for the frontend.
+Important detail:
+
+- `GitHubAppService` expects `GITHUB_APP.install_url`
+- the OpenAPI spec and test config reflect that field
+- `fence/config-default.yaml` still does not list it in the default `GITHUB_APP`
+  block
+
+So if this branch is deployed for the install-link flow, `install_url` must be
+added in deployment config even though the default config block has not caught
+up yet.
 
 ## 3. Scope changes in this branch
 
