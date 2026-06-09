@@ -219,9 +219,9 @@ sequenceDiagram
     participant GitHubSvc as GitHubAppService
     participant GitHub as GitHub REST API
 
-    Client->>Fence: POST /credentials/github {"action":"installation_token","owner","repo","organization","access"}
+    Client->>Fence: POST /credentials/github {"action":"installation_token","owner","repo","organization","project","access"}
     Fence->>Fence: require_auth_header({"github_credentials"})
-    Fence->>Arborist: auth_request(resource=/programs/<org-or-owner>/projects/<repo>, methods=read or create/write-storage)
+    Fence->>Arborist: auth_request(resource=/programs/<org-or-owner>/projects/<project-or-repo>, methods=read or create/write-storage)
 
     alt authorized
         Arborist-->>Fence: allow
@@ -257,7 +257,7 @@ Arborist resources first.
 Repository-scoped authorization:
 
 - resource:
-  - `/programs/{organization-or-owner}/projects/{repo}`
+  - `/programs/{organization-or-owner}/projects/{project-or-repo}`
 - methods for read token:
   - `read`
 - methods for write token:

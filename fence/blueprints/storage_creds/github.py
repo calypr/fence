@@ -12,7 +12,6 @@ def _authorize_repository(
     repo: str,
     organization: str = "",
     project: str = "",
-    resource_path: str = "",
     access: str = "read",
 ):
     if not hasattr(flask.current_app, "arborist"):
@@ -21,10 +20,8 @@ def _authorize_repository(
         )
 
     calypr_org = organization.strip() or owner
-    resource = resource_path.strip()
-    if not resource:
-        calypr_project = project.strip() or repo
-        resource = f"/programs/{calypr_org}/projects/{calypr_project}"
+    calypr_project = project.strip() or repo
+    resource = f"/programs/{calypr_org}/projects/{calypr_project}"
     methods = ["read"]
     if access == "write":
         methods = ["create", "write-storage"]
@@ -75,7 +72,6 @@ class GitHubCredentialBroker(Resource):
             repo = str(payload.get("repo", "")).strip()
             organization = str(payload.get("organization", "")).strip()
             project = str(payload.get("project", "")).strip()
-            resource_path = str(payload.get("resource_path", "")).strip()
             access = str(payload.get("access", "read")).strip().lower() or "read"
             if not owner or not repo:
                 raise UserError("request body must include non-empty owner and repo")
@@ -86,7 +82,6 @@ class GitHubCredentialBroker(Resource):
                 repo,
                 organization=organization,
                 project=project,
-                resource_path=resource_path,
                 access=access,
             )
             return flask.jsonify(service.create_installation_token(owner, repo, access=access))
@@ -96,7 +91,6 @@ class GitHubCredentialBroker(Resource):
             repo = str(payload.get("repo", "")).strip()
             organization = str(payload.get("organization", "")).strip()
             project = str(payload.get("project", "")).strip()
-            resource_path = str(payload.get("resource_path", "")).strip()
             if not owner or not repo:
                 raise UserError("request body must include non-empty owner and repo")
             _authorize_repository(
@@ -104,7 +98,6 @@ class GitHubCredentialBroker(Resource):
                 repo,
                 organization=organization,
                 project=project,
-                resource_path=resource_path,
             )
             return flask.jsonify(service.get_installation_status(owner, repo))
 

@@ -193,9 +193,6 @@ def test_github_installation_status_not_found(
 
 
 @responses.activate
-
-
-@responses.activate
 def test_github_organization_installation_success(
     client, encoded_creds_jwt, mock_arborist_requests
 ):
@@ -402,7 +399,7 @@ def test_github_installation_token_requires_authz(
     assert response.status_code == 403
 
 
-def test_github_installation_token_uses_calypr_project_for_authz(
+def test_github_repository_installation_uses_calypr_project_for_authz(
     client, encoded_creds_jwt, app, monkeypatch
 ):
     def auth_request(*, service, methods, resources, **kwargs):
@@ -431,6 +428,104 @@ def test_github_installation_token_uses_calypr_project_for_authz(
     )
 
     assert response.status_code == 200
+
+
+@responses.activate
+def test_github_installation_token_uses_calypr_project_for_authz(
+    client, encoded_creds_jwt, app, monkeypatch
+):
+    def auth_request(*, service, methods, resources, **kwargs):
+        assert service == "fence"
+        assert methods == ["read"]
+        assert resources == ["/programs/Ellrott_Lab/projects/test"]
+        return True
+
+    monkeypatch.setattr(app.arborist, "auth_request", auth_request)
+    responses.add(
+        responses.GET,
+        "https://api.github.example/repos/EllrottLab/test_project_creation/installation",
+        json={"id": 42},
+        status=200,
+    )
+    responses.add(
+        responses.POST,
+        "https://api.github.example/app/installations/42/access_tokens",
+        json={"token": "ghs_test", "expires_at": "2026-05-20T18:00:00Z"},
+        status=201,
+    )
+
+    response = client.post(
+        "/credentials/github",
+        json={
+            "action": "installation_token",
+            "owner": "EllrottLab",
+            "organization": "Ellrott_Lab",
+            "repo": "test_project_creation",
+            "project": "test",
+        },
+        headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json == {
+        "token": "ghs_test",
+        "expires_at": "2026-05-20T18:00:00Z",
+        "repository": {"owner": "EllrottLab", "repo": "test_project_creation"},
+    }
+
+
+@responses.activate
+def test_github_installation_token_write_uses_calypr_project_for_authz(
+    client, encoded_creds_jwt, app, monkeypatch
+):
+    def auth_request(*, service, methods, resources, **kwargs):
+        assert service == "fence"
+        assert methods == ["create", "write-storage"]
+        assert resources == ["/programs/Ellrott_Lab/projects/test"]
+        return True
+
+    monkeypatch.setattr(app.arborist, "auth_request", auth_request)
+    responses.add(
+        responses.GET,
+        "https://api.github.example/repos/EllrottLab/test_project_creation/installation",
+        json={"id": 42},
+        status=200,
+    )
+    responses.add(
+        responses.POST,
+        "https://api.github.example/app/installations/42/access_tokens",
+        match=[responses.matchers.json_params_matcher(
+            {
+                "permissions": {
+                    "contents": "write",
+                    "metadata": "read",
+                    "pull_requests": "write",
+                }
+            }
+        )],
+        json={"token": "ghs_write", "expires_at": "2026-05-20T18:00:00Z"},
+        status=201,
+    )
+
+    response = client.post(
+        "/credentials/github",
+        json={
+            "action": "installation_token",
+            "owner": "EllrottLab",
+            "organization": "Ellrott_Lab",
+            "repo": "test_project_creation",
+            "project": "test",
+            "access": "write",
+        },
+        headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json == {
+        "token": "ghs_write",
+        "expires_at": "2026-05-20T18:00:00Z",
+        "repository": {"owner": "EllrottLab", "repo": "test_project_creation"},
+    }
 
 
 def test_github_installation_token_write_requires_authz(

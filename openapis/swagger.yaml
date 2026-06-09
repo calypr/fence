@@ -2373,10 +2373,16 @@ components:
             - installation_token
         owner:
           type: string
-          description: GitHub repository owner, mapped to the Gen3 program
+          description: GitHub repository owner/login used for GitHub App repository lookups
         repo:
           type: string
-          description: GitHub repository name, mapped to the Gen3 project
+          description: GitHub repository name used for GitHub App repository lookups
+        organization:
+          type: string
+          description: Optional Calypr organization slug used for Arborist authorization; defaults to owner
+        project:
+          type: string
+          description: Optional Calypr project slug used for Arborist authorization; defaults to repo
         access:
           type: string
           description: Requested GitHub installation token capability
@@ -2386,8 +2392,10 @@ components:
           default: read
       example:
         action: installation_token
-        owner: example-program
-        repo: example-project
+        owner: example-github-org
+        repo: example-github-repo
+        organization: example-program
+        project: example-project
         access: read
     GitHubInstallationURLRequest:
       type: object
@@ -2442,14 +2450,22 @@ components:
             - repository_installation
         owner:
           type: string
-          description: GitHub repository owner, mapped to the Gen3 program
+          description: GitHub repository owner/login used for GitHub App repository lookups
         repo:
           type: string
-          description: GitHub repository name, mapped to the Gen3 project
+          description: GitHub repository name used for GitHub App repository lookups
+        organization:
+          type: string
+          description: Optional Calypr organization slug used for Arborist authorization; defaults to owner
+        project:
+          type: string
+          description: Optional Calypr project slug used for Arborist authorization; defaults to repo
       example:
         action: repository_installation
-        owner: example-program
-        repo: example-project
+        owner: example-github-org
+        repo: example-github-repo
+        organization: example-program
+        project: example-project
     GitHubOrganizationInstallationRequest:
       type: object
       required:
