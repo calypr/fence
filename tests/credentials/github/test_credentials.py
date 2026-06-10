@@ -262,7 +262,22 @@ def test_github_organization_installation_not_found(
 
 
 @responses.activate
-def test_github_installation_repositories_success(client, encoded_creds_jwt):
+def test_github_installation_repositories_success(
+    client, encoded_creds_jwt, mock_arborist_requests
+):
+    mock_arborist_requests({"arborist/auth/request": {"POST": ({"auth": True}, 200)}})
+    responses.add(
+        responses.GET,
+        "https://api.github.example/orgs/EllrottLab/installation",
+        json={
+            "id": 42,
+            "target_type": "Organization",
+            "repository_selection": "selected",
+            "html_url": "https://github.com/organizations/EllrottLab/settings/installations/42",
+            "account": {"login": "EllrottLab"},
+        },
+        status=200,
+    )
     responses.add(
         responses.POST,
         "https://api.github.example/app/installations/42/access_tokens",
@@ -288,7 +303,12 @@ def test_github_installation_repositories_success(client, encoded_creds_jwt):
 
     response = client.post(
         "/credentials/github",
-        json={"action": "installation_repositories", "installation_id": 42},
+        json={
+            "action": "installation_repositories",
+            "owner": "EllrottLab",
+            "organization": "Ellrott_Lab",
+            "installation_id": 42,
+        },
         headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
     )
 
@@ -310,9 +330,65 @@ def test_github_installation_repositories_success(client, encoded_creds_jwt):
 def test_github_installation_repositories_requires_authorization(client):
     response = client.post(
         "/credentials/github",
-        json={"action": "installation_repositories", "installation_id": 42},
+        json={
+            "action": "installation_repositories",
+            "owner": "EllrottLab",
+            "organization": "Ellrott_Lab",
+            "installation_id": 42,
+        },
     )
     assert response.status_code == 401
+
+
+def test_github_installation_repositories_requires_authz(
+    client, encoded_creds_jwt, mock_arborist_requests
+):
+    mock_arborist_requests({"arborist/auth/request": {"POST": ({"auth": False}, 200)}})
+
+    response = client.post(
+        "/credentials/github",
+        json={
+            "action": "installation_repositories",
+            "owner": "EllrottLab",
+            "organization": "Ellrott_Lab",
+            "installation_id": 42,
+        },
+        headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
+    )
+
+    assert response.status_code == 403
+
+
+@responses.activate
+def test_github_installation_repositories_rejects_mismatched_installation(
+    client, encoded_creds_jwt, mock_arborist_requests
+):
+    mock_arborist_requests({"arborist/auth/request": {"POST": ({"auth": True}, 200)}})
+    responses.add(
+        responses.GET,
+        "https://api.github.example/orgs/EllrottLab/installation",
+        json={
+            "id": 43,
+            "target_type": "Organization",
+            "repository_selection": "selected",
+            "html_url": "https://github.com/organizations/EllrottLab/settings/installations/43",
+            "account": {"login": "EllrottLab"},
+        },
+        status=200,
+    )
+
+    response = client.post(
+        "/credentials/github",
+        json={
+            "action": "installation_repositories",
+            "owner": "EllrottLab",
+            "organization": "Ellrott_Lab",
+            "installation_id": 42,
+        },
+        headers={"Authorization": "Bearer " + encoded_creds_jwt["jwt"]},
+    )
+
+    assert response.status_code == 403
 
 
 def test_github_organization_installation_requires_authz(

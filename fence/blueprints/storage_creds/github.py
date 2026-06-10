@@ -125,6 +125,10 @@ class GitHubCredentialBroker(Resource):
             return flask.jsonify(service.get_organization_installation(owner))
 
         if action == "installation_repositories":
+            owner = str(payload.get("owner", "")).strip()
+            organization = str(payload.get("organization", "")).strip() or owner
+            if not owner:
+                raise UserError("request body must include non-empty owner")
             installation_id = payload.get("installation_id")
             try:
                 installation_id = int(installation_id)
@@ -132,6 +136,16 @@ class GitHubCredentialBroker(Resource):
                 raise UserError("request body must include a positive installation_id")
             if installation_id <= 0:
                 raise UserError("request body must include a positive installation_id")
+            _authorize_organization(organization)
+            installation = service.get_organization_installation(owner)
+            if not installation.get("installed"):
+                raise Forbidden(
+                    "GitHub App is not installed for the requested organization"
+                )
+            if installation.get("installation_id") != installation_id:
+                raise Forbidden(
+                    "installation_id does not match the requested organization installation"
+                )
             return flask.jsonify(service.list_installation_repositories(installation_id))
 
         raise UserError(
