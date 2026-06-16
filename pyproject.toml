@@ -2,10 +2,10 @@
 name = "fence"
 version = "13.1.0"
 description = "Gen3 AuthN/AuthZ OIDC Service"
-authors = ["CTDS UChicago <cdis@uchicago.edu>"]
+authors = ["Calypr"]
 license = "Apache-2.0"
 readme = "README.md"
-repository = "https://github.com/uc-cdis/fence"
+repository = "https://github.com/calypr/fence"
 include = [
   "NOTICE",
 ]
@@ -64,6 +64,7 @@ pytz = ">=2025.2"
 mock = ">=2.0.0"
 httpx = ">=0.28.1"
 urllib3 = ">=2.6.3, <3"
+redis = ">=5.2.1,<7"
 
 [tool.poetry.group.dev.dependencies]
 addict = ">=2.2.1"

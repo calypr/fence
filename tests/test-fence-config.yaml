@@ -181,6 +181,7 @@ CLIENT_ALLOWED_SCOPES:
   - "openid"
   - "user"
   - "data"
+  - "github_credentials"
   - "google_credentials"
   - "google_service_account"
   - "google_link"
@@ -192,6 +193,7 @@ USER_ALLOWED_SCOPES:
   - "user"
   - "data"
   - "admin"
+  - "github_credentials"
   - "google_credentials"
   - "google_service_account"
   - "google_link"
@@ -208,6 +210,17 @@ SESSION_ALLOWED_SCOPES:
   - "google_credentials"
   - "google_service_account"
   - "google_link"
+
+GITHUB_APP:
+  app_id: "12345"
+  private_key: |
+    -----BEGIN PRIVATE KEY-----
+    test-private-key
+    -----END PRIVATE KEY-----
+  private_key_file: ""
+  api_base_url: "https://api.github.example"
+  timeout_seconds: 10
+  install_url: "https://github.com/apps/calypr-github/installations/new"
 
 # //////////////////////////////////////////////////////////////////////////////////////
 # LOGIN
@@ -565,18 +578,8 @@ HTTP_PROXY:
 
 # //////////////////////////////////////////////////////////////////////////////////////
 # MICROSERVICE PATHS
-#   - Support `/data` endpoints (INDEXD) & authz functionality (ARBORIST)
+#   - Support authz functionality (ARBORIST)
 # //////////////////////////////////////////////////////////////////////////////////////
-# url where indexd microservice is running (for signed urls primarily)
-# NOTE: Leaving as null will force fence to default to {{BASE_URL}}/index
-# example value: 'https://example.com/index'
-INDEXD: null
-
-# this is the username which fence uses to make authenticated requests to indexd
-INDEXD_USERNAME: 'gdcapi'
-# this is the password which fence uses to make authenticated requests to indexd
-INDEXD_PASSWORD: 'fake_password' # pragma: allowlist secret
-
 # url where authz microservice is running
 ARBORIST: '/arborist'
 
@@ -720,11 +723,8 @@ MAX_ROLE_SESSION_INCREASE: true
 ASSUME_ROLE_CACHE_SECONDS: 1800
 
 # //////////////////////////////////////////////////////////////////////////////////////
-# GA4GH SUPPORT: DATA ACCESS AND AUTHORIZATION SYNCING
+# GA4GH SUPPORT: AUTHORIZATION SYNCING
 # //////////////////////////////////////////////////////////////////////////////////////
-# whether or not to accept GA4GH Passports as a means of AuthN/Z to the DRS data access endpoint
-GA4GH_PASSPORTS_TO_DRS_ENABLED: true
-
 # RAS refresh_tokens expire in 15 days
 RAS_REFRESH_EXPIRATION: 1296000
 # List of JWT issuers from which Fence will accept GA4GH visas

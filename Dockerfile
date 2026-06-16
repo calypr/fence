@@ -1,84 +1,82 @@
-# To build: docker build -t fence:latest .
-# To run interactive:
-#   docker run -v ~/.gen3/fence/fence-config.yaml:/var/www/fence/fence-config.yaml -v ./keys/:/fence/keys/ fence:latest
-# To check running container do: docker exec -it CONTAINER bash
+# To build:
+#   docker build -t quay.io/<org>/fence:latest .
+# To run:
+#   docker run -p 80:80 \
+#     -v ~/.gen3/fence/fence-config.yaml:/var/www/fence/fence-config.yaml \
+#     -v ./keys:/fence/keys \
+#     quay.io/<org>/fence:latest
 
-ARG AZLINUX_BASE_VERSION=3.13-pythonnginx
+FROM python:3.13-slim AS builder
 
-# ------ Base stage ------
-FROM quay.io/cdis/amazonlinux-base:${AZLINUX_BASE_VERSION} AS base
-# Comment this in, and comment out the line above, if quay is down
-# FROM 707767160287.dkr.ecr.us-east-1.amazonaws.com/gen3/python-nginx-al:${AZLINUX_BASE_VERSION} as base
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    POETRY_VERSION=2.2.1 \
+    POETRY_NO_INTERACTION=1 \
+    POETRY_VIRTUALENVS_IN_PROJECT=true
 
-ENV appname=fence
+WORKDIR /src
 
-WORKDIR /${appname}
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN chown -R gen3:gen3 /${appname}
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir "poetry==${POETRY_VERSION}"
 
-USER root
-RUN chown -R gen3:gen3 /venv/
-USER gen3
-# ------ Builder stage ------
-FROM base AS builder
+COPY poetry.lock pyproject.toml README.md /src/
+RUN poetry install --no-root --only main
 
-USER gen3
+COPY . /src
 
-# copy ONLY poetry artifact, install the dependencies but not the app;
-# this will make sure that the dependencies are cached
-COPY poetry.lock pyproject.toml /${appname}/
-RUN poetry install -vv --no-root --only main --no-interaction
+RUN poetry install --without dev
+RUN /src/.venv/bin/python -m gunicorn --version >/dev/null
 
-# Move app files into working directory
-COPY --chown=gen3:gen3 . /$appname
-COPY --chown=gen3:gen3 ./deployment/wsgi/wsgi.py /$appname/wsgi.py
+ARG GITCOMMIT=unknown
+ARG GITVERSION=unknown
+RUN resolved_commit="$GITCOMMIT"; \
+    resolved_version="$GITVERSION"; \
+    if [ "$resolved_commit" = "unknown" ] && git rev-parse HEAD >/dev/null 2>&1; then \
+      resolved_commit="$(git rev-parse HEAD)"; \
+    fi; \
+    if [ "$resolved_version" = "unknown" ] && git describe --always --tags >/dev/null 2>&1; then \
+      resolved_version="$(git describe --always --tags)"; \
+    fi; \
+    printf 'COMMIT="%s"\nVERSION="%s"\n' "$resolved_commit" "$resolved_version" > /src/fence/version_data.py
 
-# install the app
-RUN poetry install --without dev --no-interaction
+FROM python:3.13-slim
 
-# Setup version info
-RUN git config --global --add safe.directory ${appname} && COMMIT=`git rev-parse HEAD` && echo "COMMIT=\"${COMMIT}\"" > $appname/version_data.py \
-    && VERSION=`git describe --always --tags` && echo "VERSION=\"${VERSION}\"" >> $appname/version_data.py
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/fence/.venv/bin:${PATH}" \
+    PROMETHEUS_MULTIPROC_DIR=/var/tmp/prometheus_metrics
 
+WORKDIR /fence
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    ca-certificates \
+    ccrypt \
+    libpq5 \
+    openssh-client \
+    openssl \
+    tar \
+    tzdata \
+    && rm -rf /var/lib/apt/lists/*
 
-# ------ Final stage ------
-FROM base
+RUN groupadd --system gen3 && \
+    useradd --system --gid gen3 --home-dir /fence --shell /usr/sbin/nologin gen3 && \
+    mkdir -p \
+      /fence/keys \
+      /var/tmp/prometheus_metrics \
+      /var/www/fence && \
+    chown -R gen3:gen3 \
+      /fence \
+      /var/tmp/prometheus_metrics \
+      /var/www/fence
 
-# Import global virtualenv from builder
-COPY --from=builder /venv /venv
-ENV PATH="/venv/bin:$PATH"
+COPY --from=builder /src /fence
 
-# FIXME: Remove this when it's in the base image
-ENV PROMETHEUS_MULTIPROC_DIR="/var/tmp/prometheus_metrics"
-RUN mkdir -p "${PROMETHEUS_MULTIPROC_DIR}" \
-    && chown gen3:gen3 "${PROMETHEUS_MULTIPROC_DIR}"
-
-# Switching to root user to run dnf upgrades
-USER root
-# Install ccrypt to decrypt dbgap telmetry files
-RUN echo "Upgrading dnf"; \
-    dnf upgrade -y; \
-    echo "Installing Packages"; \
-    dnf install -y \
-        libxcrypt-compat-4.4.33 \
-        libpq-15.0 \
-        gcc \
-        diffutils \
-        tar xz; \
-    echo "Installing RPM"; \
-    rpm -i https://ccrypt.sourceforge.net/download/1.11/ccrypt-1.11-1.src.rpm && \
-    cd /root/rpmbuild/SOURCES/ && \
-    tar -zxf ccrypt-1.11.tar.gz && cd ccrypt-1.11 && ./configure --disable-libcrypt && make install && make check;
-RUN mkdir -p /var/www/fence && chown -R gen3:gen3 /var/www/fence
-# This `sed` command was previously executed in the usersync CronJob as it is required for DBGaP sync:
-# https://github.com/uc-cdis/gen3-helm/blob/e5f49978ac16364374252b8dfd9cfa28df4baf9a/helm/fence/templates/usersync-cron.yaml#L249C17-L249C192
-#
-# The logic has been moved into the Dockerfile because it requires root privileges,
-# while the usersync CronJob now runs as a non-root user.
-RUN sed -i 's/KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,/KexAlgorithms ecdh-sha2-nistp256,/g' /etc/crypto-policies/back-ends/openssh.config
-
-USER gen3
-COPY --chown=gen3:gen3 --from=builder /$appname /$appname
-
-CMD ["/bin/bash", "-c", "/fence/dockerrun.bash"]
+EXPOSE 80
+CMD ["/bin/bash", "/fence/dockerrun.bash"]

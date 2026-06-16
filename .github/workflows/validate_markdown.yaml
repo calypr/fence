@@ -11,6 +11,22 @@ on:
     - "**.md"
 
 jobs:
-  markdown_validation:
+  markdown-validation:
     name: Markdown validation
-    uses: uc-cdis/.github/.github/workflows/validate_markdown.yaml@master
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Find changed Markdown files
+      id: changed-markdown
+      uses: tj-actions/changed-files@v46
+      with:
+        files: |
+          **/*.md
+
+    - name: Lint markdown
+      if: steps.changed-markdown.outputs.any_changed == 'true'
+      uses: DavidAnson/markdownlint-cli2-action@v18
+      with:
+        globs: ${{ steps.changed-markdown.outputs.all_changed_files }}

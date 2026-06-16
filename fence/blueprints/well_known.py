@@ -100,7 +100,7 @@ def openid_configuration():
             "display_values_supported": ["page"],
             "claim_types_supported": ["normal"],
             "claims_supported": claims_supported,
-            "service_documentation": "https://github.com/uc-cdis/fence/",
+            "service_documentation": "https://github.com/calypr/fence/",
             "claims_locales_supported": ["en"],
             "ui_locales_supported": ["en"],
             "claims_parameter_supported": False,

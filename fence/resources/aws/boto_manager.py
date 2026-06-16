@@ -3,7 +3,7 @@ import uuid
 from boto3 import client
 from boto3.exceptions import Boto3Error
 
-from fence.errors import UserError, InternalError, UnavailableError, NotFound
+from fence.errors import UserError, InternalError, UnavailableError
 
 
 class BotoManager(object):
@@ -11,8 +11,6 @@ class BotoManager(object):
     AWS manager singleton.
     """
 
-    URL_EXPIRATION_DEFAULT = 1800  # 30 minutes
-    URL_EXPIRATION_MAX = 86400  # 1 day
     AWS_ASSUME_ROLE_MIN_EXPIRATION = (
         900  # minimum time for aws assume role is 900 seconds as per boto docs
     )
@@ -45,44 +43,6 @@ class BotoManager(object):
             return self.s3_clients[0]
         return self.s3_clients[bucket]
 
-    def delete_data_file(self, bucket, prefix):
-        """
-        We use buckets with versioning disabled.
-
-        See AWS docs here:
-
-            https://docs.aws.amazon.com/AmazonS3/latest/dev/DeletingObjectsfromVersioningSuspendedBuckets.html
-        """
-        try:
-            s3_client = self.get_s3_client(bucket)
-            s3_objects = s3_client.list_objects_v2(
-                Bucket=bucket, Prefix=prefix, Delimiter="/"
-            )
-
-            if not s3_objects.get("Contents"):
-                # file not found in the bucket
-                self.logger.info(
-                    "tried to delete prefix {} but didn't find in bucket {}".format(
-                        prefix, bucket
-                    )
-                )
-                return (
-                    "Unable to delete the data file associated with this record. Backing off.",
-                    404,
-                )
-            if len(s3_objects["Contents"]) > 1:
-                self.logger.error("multiple files found with prefix {}".format(prefix))
-                return ("Multiple files found matching this prefix. Backing off.", 400)
-            key = s3_objects["Contents"][0]["Key"]
-            s3_client.delete_object(Bucket=bucket, Key=key)
-            self.logger.info(
-                "deleted file for prefix {} in bucket {}".format(prefix, bucket)
-            )
-            return ("", 204)
-        except (KeyError, Boto3Error) as e:
-            self.logger.error("Failed to delete file: {}".format(str(e)))
-            return ("Unable to delete data file.", 500)
-
     def assume_role(self, role_arn, duration_seconds, config=None):
         assert (
             duration_seconds
@@ -105,28 +65,6 @@ class BotoManager(object):
         except Exception as ex:
             self.logger.exception(ex)
             raise UnavailableError("Fail to reach AWS: {}".format(ex))
-
-    def presigned_url(self, bucket, key, expires, config, method="get_object"):
-        """
-        Args:
-            bucket (str): bucket name
-            key (str): key in bucket
-            expires (int): presigned URL expiration time, in seconds
-            config (dict): additional parameters if necessary (e.g. updating access key)
-            method (str): "get_object" or "put_object" (ClientMethod argument to boto)
-        """
-        if method not in ["get_object", "put_object"]:
-            raise UserError("method {} not allowed".format(method))
-        if "aws_access_key_id" in config:
-            self.s3_client = client("s3", **config)
-        expires = int(expires) or self.URL_EXPIRATION_DEFAULT
-        expires = min(expires, self.URL_EXPIRATION_MAX)
-        params = {"Bucket": bucket, "Key": key}
-        if method == "put_object":
-            params["ServerSideEncryption"] = "AES256"
-        return self.s3_client.generate_presigned_url(
-            ClientMethod=method, Params=params, ExpiresIn=expires
-        )
 
     def get_bucket_region(self, bucket, config):
         try:

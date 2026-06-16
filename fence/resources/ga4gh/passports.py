@@ -7,9 +7,6 @@ import time
 import datetime
 import jwt
 
-# the whole fence_create module is imported to avoid issue with circular imports
-import fence.scripting.fence_create
-
 from authutils.errors import JWTError
 from authutils.token.core import get_iss, get_kid
 from cdislogging import get_logger
@@ -389,10 +386,12 @@ def _sync_validated_visa_authorization(
         None
     """
     db_session = db_session or current_app.scoped_session()
-    default_args = fence.scripting.fence_create.get_default_init_syncer_inputs(
-        authz_provider="GA4GH"
-    )
-    syncer = fence.scripting.fence_create.init_syncer(**default_args)
+    # Import lazily to avoid the module cycle:
+    # ras_oauth2 -> passports -> fence_create -> access_token_updater -> ras_oauth2
+    from fence.scripting import fence_create
+
+    default_args = fence_create.get_default_init_syncer_inputs(authz_provider="GA4GH")
+    syncer = fence_create.init_syncer(**default_args)
 
     synced_visas = syncer.sync_single_user_visas(
         gen3_user,

@@ -36,7 +36,6 @@ config.load(
 
 from fence.auth import logout, build_redirect_url
 from fence.metrics import metrics
-from fence.blueprints.data.indexd import S3IndexedFileLocation
 from fence.errors import UserError
 from fence.jwt import keys
 from fence.oidc.client import query_client
@@ -57,7 +56,6 @@ from fence.resources.user.user_session import UserSessionInterface
 from fence.error_handler import get_error_response
 from fence.utils import get_SQLAlchemyDriver, allowed_login_redirects, domain
 import fence.blueprints.admin
-import fence.blueprints.data
 import fence.blueprints.login
 import fence.blueprints.oauth2
 import fence.blueprints.misc
@@ -68,7 +66,6 @@ import fence.blueprints.link
 import fence.blueprints.google
 import fence.blueprints.privacy
 import fence.blueprints.register
-import fence.blueprints.ga4gh
 
 
 app = flask.Flask(__name__)
@@ -155,7 +152,6 @@ def app_register_blueprints(app):
     )
 
     app.register_blueprint(fence.blueprints.register.blueprint, url_prefix="/register")
-    app.register_blueprint(fence.blueprints.ga4gh.blueprint, url_prefix="/ga4gh")
 
     fence.blueprints.misc.register_misc(app)
 
@@ -300,11 +296,11 @@ def _check_buckets_aws_creds_and_region(app):
                     bucket_name
                 )
             )
-            credential = S3IndexedFileLocation.get_credential_to_access_bucket(
+            credential = _get_s3_bucket_credential(
+                app,
                 bucket_name,
                 aws_creds,
                 config.get("MAX_PRESIGNED_URL_TTL", 3600),
-                app.boto,
             )
             if not getattr(app, "boto"):
                 logger.warning(
@@ -367,7 +363,7 @@ def app_config(
 
     _setup_arborist_client(app)
     _setup_audit_service_client(app)
-    _setup_data_endpoint_and_boto(app)
+    _setup_boto(app)
     _load_keys(app, root_dir)
 
     app.storage_manager = StorageManager(config["STORAGE_CREDENTIALS"], logger=logger)
@@ -383,12 +379,46 @@ def app_config(
         _check_azure_storage(app)
 
 
-def _setup_data_endpoint_and_boto(app):
+def _get_s3_bucket_credential(app, bucket_name, aws_creds, expires_in):
+    s3_buckets = config.get("S3_BUCKETS") or {}
+    if len(aws_creds) == 0 and len(s3_buckets) == 0:
+        raise ValueError("no bucket is configured")
+    if len(aws_creds) == 0 and len(s3_buckets) > 0:
+        raise ValueError("credential for buckets is not configured")
+
+    bucket_cred = s3_buckets.get(bucket_name)
+    if bucket_cred is None:
+        raise ValueError(f"Bucket '{bucket_name}' not found in S3_BUCKETS config")
+
+    cred_key = bucket_cred.get("cred")
+    if not cred_key:
+        raise ValueError(f"credential of bucket {bucket_name} is missing")
+
+    if cred_key == "*":
+        return {"aws_access_key_id": "*"}
+
+    aws_creds_config = aws_creds.get(cred_key)
+    if aws_creds_config is None:
+        raise ValueError(f"aws credential {cred_key} for bucket {bucket_name} is not found")
+
+    role_arn = bucket_cred.get("role-arn")
+    if not role_arn:
+        return aws_creds_config
+
+    assumed_role = app.boto.assume_role(role_arn, expires_in, config=aws_creds_config)
+    cred = assumed_role["Credentials"]
+    return {
+        "aws_access_key_id": cred["AccessKeyId"],
+        "aws_secret_access_key": cred["SecretAccessKey"],
+        "aws_session_token": cred["SessionToken"],
+    }
+
+
+def _setup_boto(app):
     if "AWS_CREDENTIALS" in config and len(config["AWS_CREDENTIALS"]) > 0:
         creds = config["AWS_CREDENTIALS"]
         buckets = config.get("S3_BUCKETS", {})
         app.boto = BotoManager(creds, buckets, logger=logger)
-        app.register_blueprint(fence.blueprints.data.blueprint, url_prefix="/data")
 
 
 def _load_keys(app, root_dir):

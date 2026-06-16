@@ -3,6 +3,9 @@ from flask import current_app
 
 from fence.auth import require_auth_header
 from fence.blueprints.storage_creds.api import AccessKey, ApiKey, ApiKeyList
+from fence.blueprints.storage_creds.github import (
+    GitHubCredentialBroker,
+)
 from fence.blueprints.storage_creds.google import GoogleCredentialsList
 from fence.blueprints.storage_creds.google import GoogleCredentials
 from fence.blueprints.storage_creds.other import OtherCredentialsList
@@ -38,6 +41,7 @@ def make_creds_blueprint():
     blueprint_api.add_resource(
         AccessKey, "/api/access_token", "/cdis/access_token", strict_slashes=False
     )
+    blueprint_api.add_resource(GitHubCredentialBroker, "/github", strict_slashes=False)
 
     blueprint_api.add_resource(
         OtherCredentialsList, "/<provider>", strict_slashes=False

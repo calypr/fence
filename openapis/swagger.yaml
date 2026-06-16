@@ -7,10 +7,7 @@ info:
   version: 0.1.0
   description: >-
     Access management for Gen3 data commons. Code is available on
-    [GitHub](https://github.com/uc-cdis/fence).
-  termsOfService: 'http://cdis.uchicago.edu/terms/'
-  contact:
-    email: cdis@uchicago.edu
+    [GitHub](https://github.com/calypr/fence).
   license:
     name: Apache 2.0
     url: 'http://www.apache.org/licenses/LICENSE-2.0.html'
@@ -27,6 +24,8 @@ tags:
     description: Access credentials
   - name: credentials/google
     description: Google Credentials
+  - name: credentials/github
+    description: GitHub App installation tokens
   - name: credentials/cdis
     description: Deprecated! Use credentials/api
   - name: credentials/api
@@ -499,427 +498,6 @@ paths:
       responses:
         '302':
           description: redirect to root or url in parameter if provided
-  /data/{file_id}:
-    delete:
-      tags:
-        - data
-      summary: delete all locations of a stored data file and remove its record from indexd
-      description: >-
-        After a user uploads a data file and it is registered in indexd (before
-        or after it is mapped into the graph via metadata submission), this
-        endpoint will delete the file from its storage locations (saved in the
-        record in indexd) and delete the record in indexd.
-      security:
-        - OAuth2:
-          - data
-      responses:
-        204:
-          description: successful operation
-        500:
-          description: >-
-            internal server error; could not delete stored files, or not able to
-            delete indexd record
-          content-type: application/json
-  '/data/download/{file_id}':
-    get:
-      tags:
-        - data
-      summary: Create a signed URL for data download given a file_id
-      description: Allow users to get a signed URL for a data file.
-      security:
-        - OAuth2:
-            - user
-      operationId: downloadSignedURL
-      parameters:
-        - name: file_id
-          required: true
-          in: path
-          description: data UUID
-          schema:
-            type: string
-        - name: protocol
-          required: false
-          in: query
-          description: >-
-            a protocol provided by storage provider, e.g. http, ftp, s3, gs
-          schema:
-            type: string
-            enum:
-              - http
-              - s3
-              - gs
-        - name: expires_in
-          required: false
-          in: query
-          description: >-
-            the time (in seconds) in which return url is valid. Must be less
-            than the configured maximum (default is 3600). If it's greater,
-            the configured maximum will be used.
-          schema:
-            type: integer
-        - name: redirect
-          required: false
-          in: query
-          description: >-
-            if set, then a redirect to the signed url will be sent.
-            Otherwise, json data with the url is returned.
-          schema:
-            type: boolean
-        - name: no_force_sign
-          required: false
-          in: query
-          description: >-
-            if `no_force_sign=True`, this will
-            request to *not* sign the resulting URL (i.e. just provide the
-            public url without using anonymous signing creds).
-          schema:
-            type: boolean
-        - name: userProject
-          required: false
-          in: query
-          description: >-
-            a Google Project to bill for accessing data in requester pays buckets in Google Storage.
-            Will override any configured default billing projects. If Fence is configured
-            to automatically attempt to provide the necessary service account(s) billing permission,
-            the provided Google Project will need to have given the Fence admin service account
-            necessary permissions to create custom roles and set Project IAM policies. Please see
-            README for more information.
-          schema:
-            type: string
-      responses:
-        '200':
-          description: successful operation
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/SignedURL'
-        '400':
-          description: 'Invalid input: UUID not found or invalid location'
-        '404':
-          description: 'No location found for this file'
-  '/ga4gh/drs/v1/objects/{object_id}/access/{access_id}':
-    get:
-      summary: GA4GH DRS Access API to get a URL for fetching bytes.
-      description: >-
-        Returns a URL that can be used to fetch the bytes of a DrsObject.
-        This method only needs to be called when using an AccessMethod that contains an access_id
-        (e.g., for servers that use signed URLs for fetching object bytes).
-      operationId: GetAccessURL
-      responses:
-        '200':
-          description: The access URL was found successfully.
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/AccessURL'
-        '400':
-          description: The request is malformed.
-        '401':
-          description: The request is unauthorized.
-        '404':
-          description: The requested access URL wasn't found
-        '403':
-          description: The requester is not authorized to perform this action.
-        '500':
-          description: An unexpected error occurred.
-      parameters:
-        - name: object_id
-          schema:
-            type: string
-          in: path
-          required: true
-          description: An id of a DrsObject
-        - name: access_id
-          schema:
-            type: string
-          in: path
-          required: true
-          description: An access_id from the access_methods list of a DrsObject
-      tags:
-        - data
-    post:
-      summary: GA4GH DRS Access API to get a URL for fetching bytes.
-      description: >-
-        Returns a URL that can be used to fetch the bytes of a DrsObject.
-        This method only needs to be called when using an AccessMethod that contains an access_id
-        (e.g., for servers that use signed URLs for fetching object bytes).
-      operationId: PostAccessURL
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RequestUrlPassport'
-      responses:
-        '200':
-          description: The access URL was found successfully.
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/AccessURL'
-        '400':
-          description: The request is malformed.
-        '401':
-          description: The request is unauthorized.
-        '404':
-          description: The requested access URL wasn't found
-        '403':
-          description: The requester is not authorized to perform this action.
-        '500':
-          description: An unexpected error occurred.
-      parameters:
-        - name: object_id
-          schema:
-            type: string
-          in: path
-          required: true
-          description: An id of a DrsObject
-        - name: access_id
-          schema:
-            type: string
-          in: path
-          required: true
-          description: An access_id from the access_methods list of a DrsObject
-      tags:
-        - data
-  '/data/upload':
-    post:
-      tags:
-        - data
-      summary: >-
-        Create a new blank record in indexd to use for uploading a data file
-        less than 5GB. For files larger than 5GB, please use multipart upload presigned url
-      description: |
-        This is the first step on the API side for the data upload flow.  This
-        endpoint causes fence to make a request to indexd to create a new, blank
-        index record, and returns the GUID for this new record and a presigned
-        URL which a client can then use to upload their data file directly to a
-        storage bucket. No parameters are accepted because fence retrieves the
-        username from the current token to send to indexd for the `uploader`
-        field in the new record.
-
-        This API also supports utilizing the newer authorization within the indexing
-        service by providing an "authz" field.
-
-        If an "authz" field is provided, the authorization checks are slightly different:
-        your user must have *both* "create" and "write-storage" permission on the resources
-        you are including in the "authz" list.
-
-        In addition to a different authorization check, when "authz" is provided the
-        "uploader" field in indexd with *not* be populated.
-
-        Previous authorization check requires a more general, global upload permission:
-        "file_upload" on "/data_file" resource. When "authz" is *not* provided, this
-        endpoint will check for that permission for your user.
-
-        Accepts a "guid" field in the request body. If "guid" is provided, it checks indexd for an existing record. If not found, it raises a 404.
-      security:
-        - OAuth2:
-          - user
-          - data
-      operationId: uploadBlank
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RequestUploadBlank'
-      responses:
-        201:
-          description: successful operation; created new record in indexd
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  guid:
-                    type: string
-                    description: >-
-                      the GUID from the newly created record in indexd
-                  url:
-                    type: string
-                    description: the presigned URL usable for data upload
-        404:
-          description: Record with <guid> not found.
-  '/data/upload/{file_id}':
-    get:
-      tags:
-        - data
-      summary: Create a signed URL for data upload specified by file_id
-      description: >-
-        Allow users to get a signed URL to upload data given the location of
-        preference.
-      security:
-        - OAuth2:
-            - user
-      operationId: uploadSignedURL
-      parameters:
-        - name: file_id
-          required: true
-          in: path
-          description: data UUID
-          schema:
-            type: string
-        - name: protocol
-          required: false
-          in: query
-          description: >-
-            a protocol provided by storage provider, e.g. http, ftp, s3, gs
-          schema:
-            type: string
-            enum:
-              - http
-              - s3
-        - name: expires_in
-          required: false
-          in: query
-          description: >-
-            the time (in seconds) in which return url is valid. Must be less
-            than the configured maximum (default is 3600). If it's greater,
-            the configured maximum will be used.
-          schema:
-            type: integer
-        - name: file_name
-          required: false
-          in: query
-          description: >-
-            the requested file name in the cloud bucket you will upload to.
-            If not provided, will use the GUID/file_id
-          schema:
-            type: string
-        - name: bucket
-          required: false
-          in: query
-          description: >-
-            the requested bucket to upload to.
-            If not provided, defaults to the configured DATA_UPLOAD_BUCKET.
-          schema:
-            type: string
-      responses:
-        '200':
-          description: successful operation
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/SignedURL'
-        '400':
-          description: 'Invalid input: UUID not found or invalid location'
-  '/multipart/init':
-    post:
-      tags:
-        - data
-      summary: >-
-        Initilize a multipart upload for AWS bucket. It returns an uploadId which
-        can be used for uploading object parts (see /multipart/upload) and completing
-        the upload (see /multipart/complete)
-      description: >-
-        For uploading the big file with the size is larger than 5GB in data upload
-        flow, Fence needs to provide a list of endpoints for supporting multipart upload presigned url
-        This is the first step on the API side for the multipart upload presigned url. This endpoint
-        causes fence to make a request to indexd to create a new, blank index record, and returns
-        the GUID for this new record and an uploadId for multipart upload presigned url.
-
-
-        Accepts a "guid" field in the request body. If "guid" is provided, it checks indexd for an existing record. If not found, it raises a 404.
-      security:
-        - OAuth2:
-          - user
-          - data
-      operationId: multipartUploadInit
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/InitMultipartUpload'
-      responses:
-        201:
-          description: successful operation; created new blank record in indexd and uploadId for multipart upload
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  guid:
-                    type: string
-                    description: >-
-                      the GUID from the newly created record in indexd
-                  uploadId:
-                    type: string
-                    description: the uploadId for multipart upload presigned URL usable for data upload
-        404:
-          description: Record with <guid> not found.
-
-  '/multipart/upload':
-    post:
-      tags:
-        - data
-      summary: >-
-        Upload an object part given uploadId
-      description: >-
-        This is the second step on the API side for the multipart upload presigned url. The object is chopped into
-        multiple parts with part number start from 1. Each part is submitted to the cloud resource with this
-        endpoint by providing the part number a long with uploadId. It is worth to mention that the minimal supported
-        part size is 5 MB as describe in https://docs.aws.amazon.com/AmazonS3/latest/dev/qfacts.html
-      security:
-        - OAuth2:
-          - user
-          - data
-      operationId: multipartUpload
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RequestMultipartUpload'
-      responses:
-        200:
-          description: successful operation
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  presigned_url:
-                    type: string
-                    description: the presigned URL for uploading part
-
-  '/multipart/complete':
-    post:
-      tags:
-        - data
-      summary: >-
-        Complete aws multipart upload
-      description: >-
-        This is the last step for the multipart upload presigned url. All the parts which were submitted
-        need to be combined together. This enpoint takes a list of the part info (partNumber, Etag)
-        and uploadId in order to finish the upload
-      security:
-        - OAuth2:
-          - user
-          - data
-      operationId: multipartUploadComplete
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CompleteMultipartUpload'
-      responses:
-        200:
-          description: successful operation
-  '/data/buckets':
-    get:
-      tags:
-        - data
-      summary: >-
-       Get list of buckets and relevant bucket info
-      description: >-
-       Returns a list of buckets and relevant bucket information provided in the fence-config under AWS_BUCKETS and GS_BUCKETS.
-       It filters out sensitive information about the bucket and only shows information like bucket region.
-      operationId: getBuckets
-      responses:
-        '200':
-          description: successful operation
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/BucketInfo'
   /credentials:
     get:
       tags:
@@ -1017,6 +595,48 @@ paths:
         '405':
           description: >-
             all param not provided and is required to explicitly delete all keys
+  /credentials/github:
+    post:
+      tags:
+        - credentials/github
+      summary: GitHub App credential broker
+      description: >-
+        Perform a GitHub App broker action. The caller must present a Fence
+        bearer token with the github_credentials scope. Repository token and
+        repository installation actions require access to the mapped
+        program/project. Organization installation and install URL actions
+        require access to the mapped program. Installation repository listing
+        returns repository metadata for a GitHub App installation id.
+      security:
+        - OAuth2:
+            - github_credentials
+      operationId: brokerGitHubCredential
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GitHubBrokerRequest'
+      responses:
+        '200':
+          description: GitHub broker action completed successfully
+          content:
+            '*/*':
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/GitHubInstallationTokenResponse'
+                  - $ref: '#/components/schemas/GitHubInstallationURLResponse'
+                  - $ref: '#/components/schemas/GitHubOrganizationInstallationResponse'
+                  - $ref: '#/components/schemas/GitHubRepositoryInstallationResponse'
+                  - $ref: '#/components/schemas/GitHubInstallationRepositoriesResponse'
+        '401':
+          description: Missing or invalid bearer token
+        '403':
+          description: Caller is not authorized for the requested broker action
+        '404':
+          description: GitHub App installation not found for the requested target
+        '502':
+          description: GitHub upstream request failed
   '/credentials/google/{access_key}':
     delete:
       tags:
@@ -1869,133 +1489,6 @@ components:
         tags:
           type: object
           description: User's tags
-    RequestUrlPassport:
-      type: object
-      required: true
-      properties:
-        passports:
-          type: array
-          items:
-            type: string
-          required: true
-          description: The list of GA4GH passports containing the authorizations for a given user to access the requested file. NOTE - the key "passports" is configurable in fence via the GA4GH_DRS_POSTED_PASSPORT_FIELD field. The default of "passports" has been provided.
-    RequestUploadBlank:
-      type: object
-      required:
-      properties:
-        file_name:
-          type: string
-          required: true
-          description: the file name to use for this upload
-        bucket:
-          type: string
-          required: true
-          description: >-
-            the requested bucket to upload to.
-            If not provided, defaults to the configured DATA_UPLOAD_BUCKET.
-        guid:
-          type: string
-          required: false
-          description: GUID to be assigned to the object
-        expires_in:
-          type: integer
-          description: optional integer specifying the presigned URL lifetime
-        authz:
-          type: array
-          items:
-            type: string
-          description: requested authorization resources to be set on the
-            resulting indexed record. You must have proper authorization to set this
-      example:
-        guid: "123456abcd"
-        file_name: "my_file.bam"
-        bucket: "bucket1"
-        expires_in: 1200
-        authz: ["/programs/A"]
-    InitMultipartUpload:
-      type: object
-      required:
-      properties:
-        file_name:
-          type: string
-          required: true
-          description: the file name to use for this upload
-        guid:
-          type: string
-          required: false
-          description: GUID to be assigned to the object
-        expires_in:
-          type: integer
-          description: optional integer specifying the presigned URL lifetime
-        authz:
-          type: array
-          items:
-            type: string
-          description: requested authorization resources to be set on the
-            resulting indexed record. You must have proper authorization to set this
-        bucket:
-          type: string
-          required: false
-          description: bucket to upload to
-      example:
-        file_name: "my_file.bam"
-        expires_in: 1200
-        authz: ["/programs/A"]
-        bucket: "bucket-1"
-    RequestMultipartUpload:
-      type: object
-      required:
-      properties:
-        key:
-          type: string
-          description: >-
-            the key of the object in the format of GUID/filename
-        uploadId:
-          type: string
-          description: the uploadId for multipart presigned URL upload usable for data upload
-        partNumber:
-          type: integer
-          description: the part number of the part (start from 1)
-        expires_in:
-          type: integer
-          description: optional integer specifying the presigned URL lifetime
-        bucket:
-          type: string
-          required: false
-          description: bucket to upload\ to
-    CompleteMultipartUpload:
-      type: object
-      required:
-      properties:
-        key:
-          type: string
-          description: >-
-            the key of the object in the format of GUID/filename
-        uploadId:
-          type: string
-          description: the uploadId for multipart presigned URL upload usable for data upload
-        parts:
-          type: array
-          items:
-            type: object
-            properties:
-              partNumber:
-                type: integer
-                description: >-
-                  The part number
-              ETag:
-                type: string
-                description: the etag that cooresponds to the the object part with the partnumber
-
-          description: >-
-            List of part numbers info needed for multipart completion
-        expires_in:
-          type: integer
-          description: optional integer specifying the presigned URL lifetime
-        bucket:
-          type: string
-          required: false
-          description: bucket to upload to
     CredentialsSource:
       type: object
       required:
@@ -2307,6 +1800,287 @@ components:
             name: >-
               projects/example/serviceAccounts/example@example.iam.gserviceaccount.com/keys/1234567890abcdefghijklmnop
             validAfterTime: '2018-03-14T18:27:41Z'
+    GitHubBrokerRequest:
+      oneOf:
+        - $ref: '#/components/schemas/GitHubInstallationTokenRequest'
+        - $ref: '#/components/schemas/GitHubInstallationURLRequest'
+        - $ref: '#/components/schemas/GitHubRepositoryInstallationRequest'
+        - $ref: '#/components/schemas/GitHubOrganizationInstallationRequest'
+        - $ref: '#/components/schemas/GitHubInstallationRepositoriesRequest'
+      discriminator:
+        propertyName: action
+      example:
+        action: installation_repositories
+        installation_id: 42
+    GitHubInstallationTokenRequest:
+      type: object
+      required:
+        - action
+        - owner
+        - repo
+      properties:
+        action:
+          type: string
+          enum:
+            - installation_token
+        owner:
+          type: string
+          description: GitHub repository owner/login used for GitHub App repository lookups
+        repo:
+          type: string
+          description: GitHub repository name used for GitHub App repository lookups
+        organization:
+          type: string
+          description: Optional Calypr organization slug used for Arborist authorization; defaults to owner
+        project:
+          type: string
+          description: Optional Calypr project slug used for Arborist authorization; defaults to repo
+        access:
+          type: string
+          description: Requested GitHub installation token capability
+          enum:
+            - read
+            - write
+          default: read
+      example:
+        action: installation_token
+        owner: example-github-org
+        repo: example-github-repo
+        organization: example-program
+        project: example-project
+        access: read
+    GitHubInstallationURLRequest:
+      type: object
+      required:
+        - action
+        - owner
+      properties:
+        action:
+          type: string
+          enum:
+            - install_url
+        owner:
+          type: string
+          description: GitHub organization owner/login used for GitHub App install flow bookkeeping
+        organization:
+          type: string
+          description: Optional Calypr organization slug used for Arborist authorization; defaults to owner
+        redirect_path:
+          type: string
+          description: Optional post-install redirect path encoded into the GitHub App state
+      example:
+        action: install_url
+        owner: example-github-org
+        organization: example-program
+        redirect_path: /git/example-program
+    GitHubInstallationURLResponse:
+      type: object
+      properties:
+        install_url:
+          type: string
+          description: GitHub App installation URL
+        owner:
+          type: string
+          description: GitHub organization owner/login
+        organization:
+          type: string
+          description: Calypr organization slug used for authorization
+      example:
+        install_url: https://github.com/apps/calypr-github/installations/new?state=%2Fgit%2Fexample-program
+        owner: example-github-org
+        organization: example-program
+    GitHubRepositoryInstallationRequest:
+      type: object
+      required:
+        - action
+        - owner
+        - repo
+      properties:
+        action:
+          type: string
+          enum:
+            - repository_installation
+        owner:
+          type: string
+          description: GitHub repository owner/login used for GitHub App repository lookups
+        repo:
+          type: string
+          description: GitHub repository name used for GitHub App repository lookups
+        organization:
+          type: string
+          description: Optional Calypr organization slug used for Arborist authorization; defaults to owner
+        project:
+          type: string
+          description: Optional Calypr project slug used for Arborist authorization; defaults to repo
+      example:
+        action: repository_installation
+        owner: example-github-org
+        repo: example-github-repo
+        organization: example-program
+        project: example-project
+    GitHubOrganizationInstallationRequest:
+      type: object
+      required:
+        - action
+        - owner
+      properties:
+        action:
+          type: string
+          enum:
+            - organization_installation
+        owner:
+          type: string
+          description: GitHub organization owner/login queried against the GitHub App API
+        organization:
+          type: string
+          description: Optional Calypr organization slug used for Arborist authorization; defaults to owner
+      example:
+        action: organization_installation
+        owner: example-github-org
+        organization: example-program
+    GitHubInstallationRepositoriesRequest:
+      type: object
+      required:
+        - action
+        - installation_id
+      properties:
+        action:
+          type: string
+          enum:
+            - installation_repositories
+        installation_id:
+          type: integer
+          format: int64
+          description: GitHub App installation id from the GitHub callback
+      example:
+        action: installation_repositories
+        installation_id: 42
+    GitHubOrganizationInstallationResponse:
+      type: object
+      properties:
+        installed:
+          type: boolean
+          description: Whether the GitHub App is installed for the organization
+        organization:
+          type: string
+          description: GitHub organization owner
+        installation_id:
+          type: integer
+          format: int64
+          description: GitHub App installation id when installed
+        target:
+          type: string
+          description: Installation target login
+        target_type:
+          type: string
+          description: Installation target type
+        html_url:
+          type: string
+          description: GitHub installation settings URL
+        repository_selection:
+          type: string
+          description: Whether the installation covers all repositories or a selected set
+      example:
+        installed: true
+        organization: example-program
+        installation_id: 42
+        target: example-program
+        target_type: Organization
+        html_url: https://github.com/organizations/example-program/settings/installations/42
+        repository_selection: selected
+    GitHubRepositoryInstallationResponse:
+      type: object
+      properties:
+        installed:
+          type: boolean
+          description: Whether the GitHub App is installed for the repository
+        repository:
+          type: object
+          properties:
+            owner:
+              type: string
+            repo:
+              type: string
+        installation_id:
+          type: integer
+          format: int64
+          description: GitHub App installation id when installed
+        target:
+          type: string
+          description: Installation target login
+        target_type:
+          type: string
+          description: Installation target type
+        html_url:
+          type: string
+          description: GitHub installation settings URL
+        repository_selection:
+          type: string
+          description: Whether the installation covers all repositories or a selected set
+      example:
+        installed: true
+        repository:
+          owner: example-program
+          repo: example-project
+        installation_id: 42
+        target: example-program
+        target_type: Organization
+        html_url: https://github.com/organizations/example-program/settings/installations/42
+        repository_selection: selected
+    GitHubInstallationRepositoriesResponse:
+      type: object
+      properties:
+        installation_id:
+          type: integer
+          format: int64
+          description: GitHub App installation id
+        repositories:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                format: int64
+              name:
+                type: string
+              full_name:
+                type: string
+              html_url:
+                type: string
+              clone_url:
+                type: string
+      example:
+        installation_id: 42
+        repositories:
+          - id: 101
+            name: example-project
+            full_name: example-program/example-project
+            html_url: https://github.com/example-program/example-project
+            clone_url: https://github.com/example-program/example-project.git
+    GitHubInstallationTokenResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Short-lived GitHub App installation token
+        expires_at:
+          type: string
+          format: date-time
+          description: When the installation token expires
+        repository:
+          type: object
+          properties:
+            owner:
+              type: string
+            repo:
+              type: string
+      example:
+        token: ghs_example
+        expires_at: '2026-05-20T18:00:00Z'
+        repository:
+          owner: example-program
+          repo: example-project
     APIKeys:
       type: object
       properties:
@@ -2561,43 +2335,6 @@ components:
         azp:
           type: string
           description: 'authorized party - the party to which the ID token was issued.'
-    BucketInfo:
-      type: object
-      properties:
-        S3_BUCKETS:
-          type: object
-          description: list and info on S3 buckets configured in the fence config
-          properties:
-           bucket1:
-            type: object
-            properties:
-             region:
-               type: string
-           bucket2:
-            type: object
-            properties:
-              region:
-               type: string
-        GS_BUCKETS:
-          type: object
-          description: list and info on GS buckets configured in the fence config
-          properties:
-           bucket1:
-            type: object
-            properties:
-             region:
-               type: string
-           bucket2:
-            type: object
-            properties:
-              region:
-               type: string
-    SignedURL:
-      type: object
-      properties:
-        url:
-          type: string
-          description: the signed url issued to
     LinkedGoogleEmailExpiration:
       type: object
       properties:
