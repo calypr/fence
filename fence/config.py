@@ -42,7 +42,6 @@ class FenceConfig(Config):
             "dbGaP",
             "CIRRUS_CFG",
             "WHITE_LISTED_GOOGLE_PARENT_ORGS",
-            "CLIENT_CREDENTIALS_ON_DOWNLOAD_ENABLED",
             "DATA_UPLOAD_BUCKET",
             "DEFAULT_BACKOFF_SETTINGS_MAX_TRIES",
             "ARBORIST_TIMEOUT",
@@ -60,17 +59,6 @@ class FenceConfig(Config):
         else:
             logger.info(
                 "Environment variable 'DB' empty or not set: using 'DB' field from config file"
-            )
-
-        # allow setting INDEXD_PASSWORD via env var
-        if os.environ.get("INDEXD_PASSWORD"):
-            logger.info(
-                "Found environment variable 'INDEXD_PASSWORD': overriding 'INDEXD_PASSWORD' field from config file"
-            )
-            self["INDEXD_PASSWORD"] = os.environ["INDEXD_PASSWORD"]
-        else:
-            logger.debug(
-                "Environment variable 'INDEXD_PASSWORD' empty or not set: using 'INDEXD_PASSWORD' field from config file"
             )
 
         if "ROOT_URL" not in self._configs and "BASE_URL" in self._configs:

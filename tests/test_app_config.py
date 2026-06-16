@@ -68,14 +68,6 @@ def test_app_config():
 
     root_dir = os.path.dirname(os.path.realpath(__file__))
 
-    # delete the record operation from the data blueprint, because right now it calls a
-    # whole bunch of stuff on the arborist client to do some setup for the uploader role
-    fence.blueprints.data.blueprint.deferred_functions = [
-        f
-        for f in fence.blueprints.data.blueprint.deferred_functions
-        if f.__name__ != "record"
-    ]
-
     fake_blob_service_client = FakeBlobServiceClient()
 
     patch_list = [

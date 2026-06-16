@@ -539,10 +539,6 @@ RENEW_ACCESS_TOKEN_BEFORE_EXPIRATION: false
 # The maximum lifetime of a Gen3 passport in seconds
 GEN3_PASSPORT_EXPIRES_IN: 43200
 
-# The JSON field the GA4GH Passport is in when a request is POST-ed to DRS
-# We use the same field name for POSTs to /data/download for consistency
-GA4GH_DRS_POSTED_PASSPORT_FIELD: "passports"
-
 # The number of seconds after a refresh token from an IdP will expire if there is not
 # a specific exp configured for that IdP above in OPENID_CONNECT
 DEFAULT_REFRESH_TOKEN_EXP: 3600
@@ -807,22 +803,11 @@ HTTP_PROXY:
 
 # //////////////////////////////////////////////////////////////////////////////////////
 # MICROSERVICE PATHS
-#   - Support `/data` endpoints & authz functionality
+#   - Support authz functionality
 # //////////////////////////////////////////////////////////////////////////////////////
-# url where indexd microservice is running (for signed urls primarily)
-# NOTE: Leaving as null will force fence to default to {{BASE_URL}}/index
-# example value: 'https://example.com/index'
-INDEXD: null
-
-# this is the username which fence uses to make authenticated requests to indexd
-INDEXD_USERNAME: 'fence'
-# this is the password which fence uses to make authenticated requests to indexd
-# can also be set via env var INDEXD_PASSWORD
-INDEXD_PASSWORD: ''
-
 # //////////////////////////////////////////////////////////////////////////////////////
 # AZURE STORAGE BLOB CONFIGURATION
-#   - Support Azure Blob Data Access Methods
+#   - Support Azure-backed storage integrations
 # //////////////////////////////////////////////////////////////////////////////////////
 
 # https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage?toc=%2Fazure%2Fstorage%2Fblobs%2Ftoc.json&tabs=azure-portal#view-account-access-keys
@@ -1068,11 +1053,8 @@ REGISTERED_USERS_GROUP: ''
 SERVICE_ACCOUNT_LIMIT: 6
 
 # //////////////////////////////////////////////////////////////////////////////////////
-# GA4GH SUPPORT: DATA ACCESS AND AUTHORIZATION SYNCING
+# GA4GH SUPPORT: AUTHORIZATION SYNCING
 # //////////////////////////////////////////////////////////////////////////////////////
-# whether or not to accept GA4GH Passports as a means of AuthN/Z to the DRS data access endpoint
-GA4GH_PASSPORTS_TO_DRS_ENABLED: false
-
 # RAS refresh_tokens expire in 15 days
 RAS_REFRESH_EXPIRATION: 1296000
 # List of JWT issuers from which Fence will accept GA4GH visas
@@ -1111,6 +1093,3 @@ RAS_USERINFO_ENDPOINT: '/openid/connect/v1.1/userinfo'
 # //////////////////////////////////////////////////////////////////////////////////////
 # CLIENT CREDENTIALS
 # //////////////////////////////////////////////////////////////////////////////////////
-# set to true to enable client credentials on download/{guid} and
-# /ga4gh/drs/v1/objects/{guid}/access/{access_id}
-CLIENT_CREDENTIALS_ON_DOWNLOAD_ENABLED: false
