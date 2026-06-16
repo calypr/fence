@@ -3,9 +3,6 @@ import flask
 import copy
 import requests
 
-# the whole passports module is imported to avoid issue with circular imports
-import fence.resources.ga4gh.passports
-import fence.scripting.fence_create
 import fence.resources.ga4gh.passports
 
 from flask import current_app
