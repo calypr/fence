@@ -140,6 +140,15 @@ Relevant settings:
 - `AUTHZ_SNAPSHOT_CACHE_TTL_SECONDS`
   - default: `3600`
   - minimum enforced value: `60`
+- `AUTHZ_SNAPSHOT_CACHE_CONNECT_TIMEOUT_SECONDS`
+  - default: `0.5`
+- `AUTHZ_SNAPSHOT_CACHE_READ_TIMEOUT_SECONDS`
+  - default: `1.0`
+- `AUTHZ_SNAPSHOT_CACHE_FAILURE_COOLDOWN_SECONDS`
+  - default: `30`
+  - Redis is bypassed for this period after an operation fails
+- `AUTHZ_SNAPSHOT_CACHE_HEALTH_CHECK_INTERVAL_SECONDS`
+  - default: `30`
 
 The cache is only active when:
 
@@ -153,7 +162,9 @@ The branch adds `redis` as a runtime dependency in
 
 This cache is best-effort:
 
-- if Redis is unavailable, Fence logs a warning and falls back to Arborist
+- if Redis is unavailable or exceeds its deadline, Fence logs the operation
+  and elapsed time, disconnects the failed pool, opens a short circuit-breaker
+  cooldown, and falls back to Arborist
 - if Arborist fails, Fence logs the error and returns empty `resources` and
   `authz` for that response
 
