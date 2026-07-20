@@ -187,6 +187,11 @@ def parse_arguments():
         "--projects", dest="project_mapping", help="Specify project mapping yaml file"
     )
     dbgap_sync.add_argument("--yaml", help="Sync from yaml file")
+    dbgap_sync.add_argument(
+        "--preserve-existing-arborist-state",
+        action="store_true",
+        help="add or update Arborist state from the sync inputs without removing existing Arborist groups, bindings, or user policies",
+    )
     dbgap_sync.add_argument("--csv_dir", help="specify csv file directory")
     dbgap_sync.add_argument(
         "--sync_from_dbgap", help="sync from dbgap server True/False", default="False"
@@ -492,6 +497,7 @@ def main():
             sync_from_local_yaml_file=args.yaml,
             folder=args.folder,
             arborist=arborist,
+            preserve_existing_arborist_state=args.preserve_existing_arborist_state,
         )
     elif args.action == "dbgap-download-access-files":
         download_dbgap_files(

@@ -328,6 +328,7 @@ class UserSyncer(object):
         sync_from_local_yaml_file=None,
         arborist=None,
         folder=None,
+        preserve_existing_arborist_state=False,
     ):
         """
         Syncs ACL files from dbGap to auth database and storage backends
@@ -342,6 +343,9 @@ class UserSyncer(object):
                 ArboristClient instance if the syncer should also create
                 resources in arborist
             folder: a local folder where dbgap telemetry files will sync to
+            preserve_existing_arborist_state: when true, only add or update
+                Arborist state described by the sync inputs. Existing groups,
+                group bindings, and direct user policies are never removed.
         """
         self.sync_from_local_csv_dir = sync_from_local_csv_dir
         self.sync_from_local_yaml_file = sync_from_local_yaml_file
@@ -359,6 +363,7 @@ class UserSyncer(object):
         )
         self.arborist_client = arborist
         self.folder = folder
+        self.preserve_existing_arborist_state = preserve_existing_arborist_state
 
         self.auth_source = defaultdict(set)
         # auth_source used for logging. username : [source1, source2]
@@ -1887,16 +1892,17 @@ class UserSyncer(object):
         # update groups
         groups = user_yaml.authz.get("groups", [])
 
-        # delete from arborist the groups that have been deleted
-        # from the user.yaml
         arborist_groups = set(
             g["name"] for g in self.arborist_client.list_groups().get("groups", [])
         )
-        useryaml_groups = set(g["name"] for g in groups)
-        for deleted_group in arborist_groups.difference(useryaml_groups):
-            # do not try to delete built in groups
-            if deleted_group not in ["anonymous", "logged-in"]:
-                self.arborist_client.delete_group(deleted_group)
+        if not self.preserve_existing_arborist_state:
+            # delete from arborist the groups that have been deleted
+            # from the user.yaml
+            useryaml_groups = set(g["name"] for g in groups)
+            for deleted_group in arborist_groups.difference(useryaml_groups):
+                # do not try to delete built in groups
+                if deleted_group not in ["anonymous", "logged-in"]:
+                    self.arborist_client.delete_group(deleted_group)
 
         # create/update the groups defined in the user.yaml
         for group in groups:
@@ -1908,24 +1914,39 @@ class UserSyncer(object):
                 )
                 continue
             try:
-                response = self.arborist_client.put_group(
-                    group["name"],
-                    # Arborist doesn't handle group descriptions yet
-                    # description=group.get("description", ""),
-                    users=group["users"],
-                    policies=group["policies"],
-                )
+                if self.preserve_existing_arborist_state:
+                    # `put_group` replaces the complete membership and policy
+                    # lists, so use additive APIs when preserving state.
+                    if group["name"] not in arborist_groups:
+                        self.arborist_client.create_group(group["name"])
+                    for username in group["users"]:
+                        self.arborist_client.add_user_to_group(
+                            username, group["name"]
+                        )
+                    for policy in group["policies"]:
+                        self.arborist_client.grant_group_policy(
+                            group["name"], policy
+                        )
+                else:
+                    response = self.arborist_client.put_group(
+                        group["name"],
+                        # Arborist doesn't handle group descriptions yet
+                        # description=group.get("description", ""),
+                        users=group["users"],
+                        policies=group["policies"],
+                    )
             except ArboristError as e:
                 self.logger.info("couldn't put group: {}".format(str(e)))
 
         # Update policies for built-in (`anonymous` and `logged-in`) groups
 
-        # First recreate these groups in order to clear out old, possibly deleted policies
-        for builtin_group in ["anonymous", "logged-in"]:
-            try:
-                response = self.arborist_client.put_group(builtin_group)
-            except ArboristError as e:
-                self.logger.info("couldn't put group: {}".format(str(e)))
+        if not self.preserve_existing_arborist_state:
+            # First recreate these groups in order to clear out old, possibly deleted policies
+            for builtin_group in ["anonymous", "logged-in"]:
+                try:
+                    response = self.arborist_client.put_group(builtin_group)
+                except ArboristError as e:
+                    self.logger.info("couldn't put group: {}".format(str(e)))
 
         # Now add back policies that are in the user.yaml
         for policy in user_yaml.authz.get("anonymous_policies", []):
@@ -1983,7 +2004,9 @@ class UserSyncer(object):
             )
             user_existing_policies = user_existing_policies - anonymous_policies
 
-        if is_revoke_all is False and len(incoming_policies) > 0:
+        if self.preserve_existing_arborist_state:
+            to_add = incoming_policies - user_existing_policies
+        elif is_revoke_all is False and len(incoming_policies) > 0:
             to_add = incoming_policies - user_existing_policies
             to_remove = user_existing_policies - incoming_policies
         else:
@@ -2012,7 +2035,7 @@ class UserSyncer(object):
                 )
                 is_revoke_all = True
 
-        if is_revoke_all:
+        if is_revoke_all and not self.preserve_existing_arborist_state:
             if (
                 remove_users_with_no_policies
                 and not incoming_policies
@@ -2100,7 +2123,7 @@ class UserSyncer(object):
         # from authorization sources get policies revoked
 
         arborist_user_projects = {}
-        if not single_user_sync:
+        if not single_user_sync and not self.preserve_existing_arborist_state:
 
             try:
                 arborist_users = self.arborist_client.get_users().json["users"]
