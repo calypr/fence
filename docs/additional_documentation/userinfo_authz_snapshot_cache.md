@@ -21,7 +21,8 @@ flowchart LR
     Arborist --> Redis["Redis"]
     Redis --> UserResp
 
-    Gecko["Gecko or another client"] -->|POST /credentials/github| FenceGitHub["Fence GitHub credential broker"]
+    Gecko["Gecko or another client"] -->|POST /credentials/github| FenceGitHub
+    FenceGitHub["Fence GitHub credential broker"]
     FenceGitHub --> ArboristCheck["Arborist authz check"]
     ArboristCheck --> GitHubSvc["GitHubAppService"]
     GitHubSvc --> GitHubAPI["GitHub App / GitHub REST API"]
@@ -140,6 +141,15 @@ Relevant settings:
 - `AUTHZ_SNAPSHOT_CACHE_TTL_SECONDS`
   - default: `3600`
   - minimum enforced value: `60`
+- `AUTHZ_SNAPSHOT_CACHE_CONNECT_TIMEOUT_SECONDS`
+  - default: `0.5`
+- `AUTHZ_SNAPSHOT_CACHE_READ_TIMEOUT_SECONDS`
+  - default: `1.0`
+- `AUTHZ_SNAPSHOT_CACHE_FAILURE_COOLDOWN_SECONDS`
+  - default: `30`
+  - Redis is bypassed for this period after an operation fails
+- `AUTHZ_SNAPSHOT_CACHE_HEALTH_CHECK_INTERVAL_SECONDS`
+  - default: `30`
 
 The cache is only active when:
 
@@ -153,7 +163,9 @@ The branch adds `redis` as a runtime dependency in
 
 This cache is best-effort:
 
-- if Redis is unavailable, Fence logs a warning and falls back to Arborist
+- if Redis is unavailable or exceeds its deadline, Fence logs the operation
+  and elapsed time, disconnects the failed pool, opens a short circuit-breaker
+  cooldown, and falls back to Arborist
 - if Arborist fails, Fence logs the error and returns empty `resources` and
   `authz` for that response
 
@@ -221,7 +233,7 @@ sequenceDiagram
 
     Client->>Fence: POST /credentials/github {"action":"installation_token","owner","repo","organization","project","access"}
     Fence->>Fence: require_auth_header({"github_credentials"})
-    Fence->>Arborist: auth_request(resource=/programs/<org-or-owner>/projects/<project-or-repo>, methods=read or create/write-storage)
+    Fence->>Arborist: auth_request(resource, methods)
 
     alt authorized
         Arborist-->>Fence: allow
@@ -304,7 +316,7 @@ Installation status responses can also include:
   - whether the GitHub App install covers all repositories or only a selected
     subset
 
-### Configuration
+### GitHub App Configuration
 
 Config lives in
 [fence/config-default.yaml](/Users/peterkor/Desktop/BMEG/fence/fence/config-default.yaml).

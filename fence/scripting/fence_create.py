@@ -395,6 +395,7 @@ def init_syncer(
     sync_from_local_yaml_file=None,
     arborist=None,
     folder=None,
+    preserve_existing_arborist_state=False,
 ):
     """
     sync ACL files from dbGap to auth db and storage backends
@@ -453,6 +454,7 @@ def init_syncer(
         sync_from_local_yaml_file=sync_from_local_yaml_file,
         arborist=arborist,
         folder=folder,
+        preserve_existing_arborist_state=preserve_existing_arborist_state,
     )
 
 
@@ -494,6 +496,7 @@ def sync_users(
     sync_from_local_yaml_file=None,
     arborist=None,
     folder=None,
+    preserve_existing_arborist_state=False,
 ):
     syncer = init_syncer(
         dbGaP,
@@ -505,6 +508,7 @@ def sync_users(
         sync_from_local_yaml_file,
         arborist,
         folder,
+        preserve_existing_arborist_state,
     )
     if not syncer:
         exit(1)
