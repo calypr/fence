@@ -4,34 +4,197 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: fence-image-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REPO: quay.io/ohsu-comp-bio/fence
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+            runner_arch: x86_64
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            runner_arch: aarch64
+    runs-on: ${{ matrix.runner }}
     steps:
-    - name: Check out code
-      uses: actions/checkout@v4
+      - name: Check out code
+        uses: actions/checkout@v4
 
-    - name: Login to Quay.io
-      uses: docker/login-action@v3
-      with:
-        registry: quay.io
-        username: ${{ secrets.QUAY_USERNAME }}
-        password: ${{ secrets.QUAY_ROBOT_TOKEN }}
+      - name: Assert native runner architecture
+        env:
+          EXPECTED_ARCH: ${{ matrix.runner_arch }}
+        run: |
+          set -euo pipefail
+          actual_arch="$(uname -m)"
+          echo "Runner architecture: ${actual_arch}; expected: ${EXPECTED_ARCH}"
+          [[ "${actual_arch}" == "${EXPECTED_ARCH}" ]]
 
-    - name: Build and push image
-      env:
-        REPO: quay.io/ohsu-comp-bio/fence
-      run: |
-        BRANCH=$(echo ${GITHUB_REF#refs/*/} | tr / _)
-        echo "Setting image tag to $REPO:$BRANCH"
+      - name: Resolve image tag
+        id: image-ref
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
 
-        docker build \
-          --build-arg GITCOMMIT="${GITHUB_SHA}" \
-          --build-arg GITVERSION="${BRANCH}" \
-          -t "$REPO:$BRANCH" .
+          version="${REF_NAME//\//_}"
+          tag="${version//[^A-Za-z0-9_.-]/_}"
+          if [[ -z "${tag}" ]]; then
+            tag="ref"
+          elif [[ ! "${tag}" =~ ^[A-Za-z0-9_] ]]; then
+            tag="ref_${tag}"
+          fi
+          tag="${tag:0:128}"
+          [[ "${tag}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]
 
-        if [[ $BRANCH == 'main' ]]; then
-          docker image tag "$REPO:main" "$REPO:latest"
-        fi
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+          echo "Publishing the ${tag} image for ref ${REF_NAME}"
 
-        docker push --all-tags "$REPO"
+      - name: Login to Quay.io
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_ROBOT_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push platform image by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            GITCOMMIT=${{ github.sha }}
+            GITVERSION=${{ steps.image-ref.outputs.version }}
+          outputs: type=image,name=${{ env.REPO }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=fence-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=fence-${{ matrix.arch }}
+
+      - name: Validate and save image digest
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          [[ "${IMAGE_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]
+          mkdir -p /tmp/fence-digests
+          printf '%s\n' "${IMAGE_DIGEST}" > "/tmp/fence-digests/${{ matrix.arch }}.txt"
+
+      - name: Upload platform digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: fence-digest-${{ matrix.arch }}
+          path: /tmp/fence-digests/${{ matrix.arch }}.txt
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish multi-platform image
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download platform digests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: fence-digest-*
+          path: /tmp/fence-digests
+          merge-multiple: true
+
+      - name: Validate platform digests
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          digest_files=(/tmp/fence-digests/*.txt)
+          [[ "${#digest_files[@]}" -eq 2 ]]
+          [[ -f /tmp/fence-digests/amd64.txt ]]
+          [[ -f /tmp/fence-digests/arm64.txt ]]
+
+          digests=()
+          for arch in amd64 arm64; do
+            digest_file="/tmp/fence-digests/${arch}.txt"
+            mapfile -t digest_lines < "${digest_file}"
+            [[ "${#digest_lines[@]}" -eq 1 ]]
+            [[ "${digest_lines[0]}" =~ ^sha256:[0-9a-f]{64}$ ]]
+            digests+=("${digest_lines[0]}")
+          done
+
+          printf '%s\n' "${digests[@]}" > /tmp/fence-digests/validated.txt
+
+      - name: Login to Quay.io
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_ROBOT_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Publish multi-platform tags
+        id: publish-image
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          REF: ${{ github.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          version="${REF_NAME//\//_}"
+          tag="${version//[^A-Za-z0-9_.-]/_}"
+          if [[ -z "${tag}" ]]; then
+            tag="ref"
+          elif [[ ! "${tag}" =~ ^[A-Za-z0-9_] ]]; then
+            tag="ref_${tag}"
+          fi
+          tag="${tag:0:128}"
+          [[ "${tag}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]
+
+          mapfile -t digests < /tmp/fence-digests/validated.txt
+          [[ "${#digests[@]}" -eq 2 ]]
+
+          tags=("-t" "${REPO}:${tag}")
+          if [[ "${REF}" == refs/heads/* && "${REF_NAME}" == "${DEFAULT_BRANCH}" ]]; then
+            tags+=("-t" "${REPO}:latest")
+          fi
+
+          sources=("${REPO}@${digests[0]}" "${REPO}@${digests[1]}")
+          docker buildx imagetools create "${tags[@]}" "${sources[@]}"
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify published manifest
+        env:
+          REF: ${{ github.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          TAG: ${{ steps.publish-image.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          manifest_json="$(docker buildx imagetools inspect "${REPO}:${TAG}" --format '{{json .Manifest}}')"
+          printf '%s\n' "${manifest_json}" | jq -e '
+            ([.manifests[]? | select(.platform.os == "linux") | .platform.architecture] | sort)
+            == ["amd64", "arm64"]
+          '
+
+          if [[ "${REF}" == "refs/heads/${DEFAULT_BRANCH}" ]]; then
+            branch_digest="$(printf '%s\n' "${manifest_json}" | jq -r '.digest // empty')"
+            latest_manifest="$(docker buildx imagetools inspect "${REPO}:latest" --format '{{json .Manifest}}')"
+            latest_digest="$(printf '%s\n' "${latest_manifest}" | jq -r '.digest // empty')"
+            [[ "${branch_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]
+            [[ "${latest_digest}" == "${branch_digest}" ]]
+          fi
