@@ -14,7 +14,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     POETRY_NO_INTERACTION=1 \
     POETRY_VIRTUALENVS_IN_PROJECT=true
 
-WORKDIR /src
+WORKDIR /fence
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -25,13 +25,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir "poetry==${POETRY_VERSION}"
 
-COPY poetry.lock pyproject.toml README.md /src/
+COPY poetry.lock pyproject.toml README.md /fence/
 RUN poetry install --no-root --only main
 
-COPY . /src
+COPY . /fence
 
 RUN poetry install --without dev
-RUN /src/.venv/bin/python -m gunicorn --version >/dev/null
+RUN /fence/.venv/bin/python -m gunicorn --version >/dev/null
 
 ARG GITCOMMIT=unknown
 ARG GITVERSION=unknown
@@ -43,7 +43,7 @@ RUN resolved_commit="$GITCOMMIT"; \
     if [ "$resolved_version" = "unknown" ] && git describe --always --tags >/dev/null 2>&1; then \
       resolved_version="$(git describe --always --tags)"; \
     fi; \
-    printf 'COMMIT="%s"\nVERSION="%s"\n' "$resolved_commit" "$resolved_version" > /src/fence/version_data.py
+    printf 'COMMIT="%s"\nVERSION="%s"\n' "$resolved_commit" "$resolved_version" > /fence/fence/version_data.py
 
 FROM python:3.13-slim
 
@@ -76,7 +76,8 @@ RUN groupadd --system gen3 && \
       /var/tmp/prometheus_metrics \
       /var/www/fence
 
-COPY --from=builder /src /fence
+COPY --from=builder /fence /fence
+RUN test "$(head -n 1 /fence/.venv/bin/fence-create)" = '#!/fence/.venv/bin/python'
 
 EXPOSE 80
 CMD ["/bin/bash", "/fence/dockerrun.bash"]
