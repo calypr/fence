@@ -119,14 +119,44 @@ def reject_login_without_project_access(response):
     except Exception:
         logger.exception("Could not verify project access during login")
         flask.session.clear()
-        return flask.make_response(
-            flask.jsonify({"error": "Project access check unavailable"}), 503
+        return login_rejection_response(
+            503,
+            "We could not verify your access",
+            "The access check is temporarily unavailable. Please try again shortly.",
+            "Project access check unavailable",
         )
 
     if not has_project_read_or_write(mapping):
         flask.session.clear()
-        return flask.make_response(flask.jsonify({"error": "No project access"}), 403)
+        return login_rejection_response(
+            403,
+            "Access to CALYPR is not yet available",
+            "This account does not have read or write access to a CALYPR project. Ask your administrator for project access, then try signing in again.",
+            "No project access",
+        )
     return response
+
+
+def login_rejection_response(status_code, title, message, error):
+    if (
+        flask.request.accept_mimetypes.best_match(["text/html", "application/json"])
+        == "text/html"
+    ):
+        result = flask.make_response(
+            flask.render_template(
+                "login_access_denied.html",
+                title=title,
+                message=message,
+                home_url=config.get("ROOT_URL") or "/",
+                support_email=config.get("SUPPORT_EMAIL_FOR_ERRORS"),
+            ),
+            status_code,
+        )
+        result.headers["Referrer-Policy"] = "no-referrer"
+    else:
+        result = flask.make_response(flask.jsonify({"error": error}), status_code)
+    result.headers["Cache-Control"] = "no-store"
+    return result
 
 
 def app_sessions(app):
