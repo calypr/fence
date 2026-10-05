@@ -121,36 +121,28 @@ def reject_login_without_project_access(response):
         flask.session.clear()
         return login_rejection_response(
             503,
-            "We could not verify your access",
-            "The access check is temporarily unavailable. Please try again shortly.",
             "Project access check unavailable",
+            "access_check_unavailable",
         )
 
     if not has_project_read_or_write(mapping):
         flask.session.clear()
         return login_rejection_response(
             403,
-            "Access to CALYPR is not yet available",
-            "This account does not have read or write access to a CALYPR project. Ask your administrator for project access, then try signing in again.",
             "No project access",
+            "no_project_access",
         )
     return response
 
 
-def login_rejection_response(status_code, title, message, error):
+def login_rejection_response(status_code, error, frontend_error):
     if (
         flask.request.accept_mimetypes.best_match(["text/html", "application/json"])
         == "text/html"
     ):
-        result = flask.make_response(
-            flask.render_template(
-                "login_access_denied.html",
-                title=title,
-                message=message,
-                home_url=config.get("ROOT_URL") or "/",
-                support_email=config.get("SUPPORT_EMAIL_FOR_ERRORS"),
-            ),
-            status_code,
+        result = flask.redirect(
+            f"{(config.get('ROOT_URL') or '/').rstrip('/')}/?login_error={frontend_error}",
+            code=303,
         )
         result.headers["Referrer-Policy"] = "no-referrer"
     else:

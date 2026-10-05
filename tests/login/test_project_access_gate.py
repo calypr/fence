@@ -52,7 +52,7 @@ def test_login_gate_rejects_without_project_access(monkeypatch):
         assert not flask.session
 
 
-def test_browser_login_gets_access_guidance_without_a_session(monkeypatch):
+def test_browser_login_returns_to_frontend_without_a_session(monkeypatch):
     monkeypatch.setitem(config, "REQUIRE_PROJECT_ACCESS_ON_LOGIN", True)
     monkeypatch.setitem(config, "ROOT_URL", "https://calypr.example.org")
     app = flask.Flask("fence")
@@ -65,10 +65,10 @@ def test_browser_login_gets_access_guidance_without_a_session(monkeypatch):
         flask.session["username"] = "user@example.org"
         flask.g.new_login_username = "user@example.org"
         response = reject_login_without_project_access(flask.make_response("welcome"))
-        assert response.status_code == 403
-        assert response.mimetype == "text/html"
-        assert b"read or write access" in response.data
-        assert b'href="https://calypr.example.org"' in response.data
+        assert response.status_code == 303
+        assert response.location == (
+            "https://calypr.example.org/?login_error=no_project_access"
+        )
         assert response.headers["Cache-Control"] == "no-store"
         assert response.headers["Referrer-Policy"] == "no-referrer"
         assert not flask.session
