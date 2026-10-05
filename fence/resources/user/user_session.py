@@ -29,6 +29,7 @@ import pytz
 import time
 
 import flask
+import jwt
 from flask.sessions import SessionInterface, SessionMixin
 
 from fence.errors import Unauthorized
