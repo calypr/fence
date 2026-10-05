@@ -601,7 +601,11 @@ SUPPORT_EMAIL_FOR_ERRORS: null
 # Setting it to false will ensure the user will only be able to login after the user
 # is added to the Fence DB via a separate process. This two-step process allows for
 # a separate onboarding and user "approval" process, instead of the default automatic approval.
-ALLOW_NEW_USER_ON_LOGIN: true
+ALLOW_NEW_USER_ON_LOGIN: false
+
+# Reject a new browser login unless Arborist grants read or write on a project.
+# The check runs after provider authorization sync and before session cookies are sent.
+REQUIRE_PROJECT_ACCESS_ON_LOGIN: true
 
 # //////////////////////////////////////////////////////////////////////////////////////
 # SHIBBOLETH

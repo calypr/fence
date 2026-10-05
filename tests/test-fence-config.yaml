@@ -47,6 +47,8 @@ ENCRYPTION_KEY: ''
 DEBUG: false
 # if true, will automatically login a user with username "test"
 MOCK_AUTH: true
+ALLOW_NEW_USER_ON_LOGIN: true
+REQUIRE_PROJECT_ACCESS_ON_LOGIN: false
 # if true, will only fake a successful login response from Google in /login/google
 # will login as the username set in cookie DEV_LOGIN_COOKIE_NAME
 MOCK_GOOGLE_AUTH: false
