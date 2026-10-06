@@ -29,11 +29,6 @@ def get_error_response(error: Exception):
     app_name = config.get("APP_NAME", "Gen3 Data Commons")
 
     error_id = _get_error_identifier()
-    logger.error(
-        "{} HTTP error occurred. ID: {}\nDetails: {}\nTraceback: {}".format(
-            status_code, error_id, details, traceback.format_exc()
-        )
-    )
 
     # Prepare user-facing message
     message = details.get("message")
@@ -48,6 +43,20 @@ def get_error_response(error: Exception):
     except (ValueError, TypeError):
         message = None
         status_code = 500
+
+    if status_code >= 500:
+        logger.error(
+            "{} HTTP error occurred. ID: {}\nDetails: {}\nTraceback: {}".format(
+                status_code,
+                error_id,
+                details,
+                "".join(traceback.format_exception(error)),
+            )
+        )
+    elif status_code == 401:
+        logger.debug(f"{status_code} HTTP response. ID: {error_id}: {message}")
+    else:
+        logger.info(f"{status_code} HTTP response. ID: {error_id}: {message}")
 
     status_code_message = http_responses.get(status_code, "Unknown error code.")
 
@@ -90,7 +99,6 @@ def get_error_details_and_status(error):
             error.get_response().status_code,
         )
     else:
-        logger.exception("Unexpected exception occurred")
         error_code = 500
         if hasattr(error, "code"):
             error_code = error.code
