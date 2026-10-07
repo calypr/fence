@@ -10,12 +10,16 @@ from flask import current_app
 from authutils.errors import JWTError, JWTExpiredError
 from authutils.token.validate import (
     current_token,
-    require_auth_header,
+    require_auth_header as authutils_require_auth_header,
     set_current_token,
     validate_request,
 )
 from cdislogging import get_logger
 import requests
+
+# Note: Iniitalized earlier to avoid circular import errors.
+GEN3_AUDIENCE = "gen3"
+
 
 from fence.authz.auth import check_arborist_auth
 from fence.config import config
@@ -31,6 +35,44 @@ from fence.utils import (
 )
 
 logger = get_logger(__name__)
+
+
+def has_project_read_or_write(auth_mapping):
+    """Whether Arborist grants a useful action on at least one project."""
+    if not isinstance(auth_mapping, dict):
+        return False
+    methods = {"read", "write", "*"}
+    for resource, actions in auth_mapping.items():
+        parts = resource.split("/") if isinstance(resource, str) else []
+        if len(parts) != 5 or parts[1] != "programs" or parts[3] != "projects":
+            continue
+        if not parts[2] or not parts[4] or not isinstance(actions, list):
+            continue
+        for action in actions:
+            if isinstance(action, str) and action in methods:
+                return True
+            if not isinstance(action, dict):
+                continue
+            if (
+                action.get("service") in {None, "arborist", "*"}
+                and action.get("method") in methods
+            ):
+                return True
+    return False
+
+
+def require_auth_header(*args, **kwargs):
+    """
+    Injects the default token audience before calling authutils's `require_auth_header`
+    """
+    if "audience" in kwargs:
+        if type(kwargs["audience"]) != list:
+            kwargs["audience"] = [kwargs["audience"]]
+        kwargs["audience"].append(GEN3_AUDIENCE)
+    else:
+        kwargs["audience"] = GEN3_AUDIENCE
+
+    return authutils_require_auth_header(*args, **kwargs)
 
 
 def get_jwt():
@@ -224,6 +266,11 @@ def login_user_or_require_registration(
         Args:
             user (User): User object
         """
+        if (
+            flask.request.path.startswith("/login/")
+            or flask.session.get("username") != user.username
+        ):
+            flask.g.new_login_username = user.username
         flask.session["username"] = user.username
         flask.session["user_id"] = str(user.id)
         flask.session["provider"] = user.identity_provider.name
@@ -394,6 +441,7 @@ def login_required(scope=None):
             # log user in
             elif eppn:
                 username = eppn.split("!")[-1]
+                flask.g.new_login_username = username
                 flask.session["username"] = username
                 flask.session["provider"] = IdentityProvider.itrust
                 is_logged_in = login_user_or_require_registration(

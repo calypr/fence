@@ -339,6 +339,12 @@ USER_ALLOWED_SCOPES:
   - "google_link"
   - "ga4gh_passport_v1"
 
+# these are the default scopes that are included in a task access_token
+TASK_TOKEN_DEFAULT_SCOPES:
+  - "fence"
+  - "openid"
+  - "user"
+
 # these are the scopes that a browser session can create for a user (very
 # similar to USER_ALLOWED_SCOPES, as the session will actually create access_tokens
 # for an actively logged in user)
@@ -505,6 +511,12 @@ SESSION_TIMEOUT: 900
 # The maximum session lifetime in seconds.
 SESSION_LIFETIME: 28800
 
+# Renew the browser session's access token when it is within this many seconds of
+# expiring. Set to 0 to only replace the access token after it has already expired,
+# which leaves a window during which requests carry no access token at all (the
+# access token cookie expires at the same time as the token itself).
+ACCESS_TOKEN_RENEWAL_THRESHOLD: 300
+
 # The number of seconds the user's Google service account key used for
 # url signing will last before being expired/rotated
 # 30 days: 2592000 seconds
@@ -526,7 +538,17 @@ MAX_PRESIGNED_URL_TTL: 3600
 MAX_API_KEY_TTL: 2592000
 
 # The number of seconds after an access token is issued from an API key until it expires.
+# This is both the max and the default lifetime.
 MAX_ACCESS_TOKEN_TTL: 3600
+
+# The number of seconds after a task access token is issued until it expires. This max is
+# applied even if the requesting user has access to request a longer-lived token in Arborist.
+# This is configured per task token type, and falls back to `MAX_ACCESS_TOKEN_TTL`.
+MAX_TASK_TOKEN_TTL: {}
+# WORKFLOW: 345600
+
+# Task token types that can be requested by users.
+ALLOWED_TASK_TOKEN_TYPES: []
 
 # TEMPORARY: The maximum number of projects allowed in token claims.
 # This config var should be removed after sheepdog and peregrine support
@@ -579,7 +601,11 @@ SUPPORT_EMAIL_FOR_ERRORS: null
 # Setting it to false will ensure the user will only be able to login after the user
 # is added to the Fence DB via a separate process. This two-step process allows for
 # a separate onboarding and user "approval" process, instead of the default automatic approval.
-ALLOW_NEW_USER_ON_LOGIN: true
+ALLOW_NEW_USER_ON_LOGIN: false
+
+# Reject a new browser login unless Arborist grants read or write on a project.
+# The check runs after provider authorization sync and before session cookies are sent.
+REQUIRE_PROJECT_ACCESS_ON_LOGIN: true
 
 # //////////////////////////////////////////////////////////////////////////////////////
 # SHIBBOLETH

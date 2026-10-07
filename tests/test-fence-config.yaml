@@ -47,6 +47,8 @@ ENCRYPTION_KEY: ''
 DEBUG: false
 # if true, will automatically login a user with username "test"
 MOCK_AUTH: true
+ALLOW_NEW_USER_ON_LOGIN: true
+REQUIRE_PROJECT_ACCESS_ON_LOGIN: false
 # if true, will only fake a successful login response from Google in /login/google
 # will login as the username set in cookie DEV_LOGIN_COOKIE_NAME
 MOCK_GOOGLE_AUTH: false
@@ -197,6 +199,11 @@ USER_ALLOWED_SCOPES:
   - "google_credentials"
   - "google_service_account"
   - "google_link"
+
+TASK_TOKEN_DEFAULT_SCOPES:
+  - "fence"
+  - "openid"
+  - "user"
 
 # these are the scopes that a browser session can create for a user (very
 # similar to USER_ALLOWED_SCOPES, as the session will actually create access_tokens
@@ -365,6 +372,11 @@ MAX_API_KEY_TTL: 2592000
 
 # The number of seconds after an access token is issued from an API key until it expires.
 MAX_ACCESS_TOKEN_TTL: 3600
+
+MAX_TASK_TOKEN_TTL:
+  FOO: 4000
+
+ALLOWED_TASK_TOKEN_TYPES: ["FOO", "NOT_IN_CONFIG", "NOT_IN_MAPPING"]
 
 
 ########################################################################################

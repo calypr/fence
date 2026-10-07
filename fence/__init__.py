@@ -34,7 +34,7 @@ config.load(
     search_folders=CONFIG_SEARCH_FOLDERS,
 )
 
-from fence.auth import logout, build_redirect_url
+from fence.auth import logout, build_redirect_url, has_project_read_or_write
 from fence.metrics import metrics
 from fence.errors import UserError
 from fence.jwt import keys
@@ -95,10 +95,60 @@ def app_init(
     )
     app_sessions(app)
     app_register_blueprints(app)
+    app.after_request(reject_login_without_project_access)
     server.init_app(app, query_client=query_client)
     logger.info(
         f"Prometheus metrics are{'' if config['ENABLE_PROMETHEUS_METRICS'] else ' NOT'} enabled."
     )
+
+
+def reject_login_without_project_access(response):
+    """Do not issue browser session cookies for users without project access."""
+    username = getattr(flask.g, "new_login_username", None)
+    if not username or not config.get("REQUIRE_PROJECT_ACCESS_ON_LOGIN", True):
+        return response
+
+    if response.status_code >= 400:
+        flask.session.clear()
+        return response
+
+    try:
+        if not flask.current_app.arborist:
+            raise RuntimeError("Arborist is not configured")
+        mapping = flask.current_app.arborist.auth_mapping(username)
+    except Exception:
+        logger.exception("Could not verify project access during login")
+        flask.session.clear()
+        return login_rejection_response(
+            503,
+            "Project access check unavailable",
+            "access_check_unavailable",
+        )
+
+    if not has_project_read_or_write(mapping):
+        flask.session.clear()
+        return login_rejection_response(
+            403,
+            "No project access",
+            "no_project_access",
+        )
+    return response
+
+
+def login_rejection_response(status_code, error, frontend_error):
+    if (
+        flask.request.accept_mimetypes.best_match(["text/html", "application/json"])
+        == "text/html"
+    ):
+        result = flask.redirect(
+            f"{(config.get('ROOT_URL') or '/').rstrip('/')}/?login_error={frontend_error}",
+            code=303,
+        )
+        result.headers["Referrer-Policy"] = "no-referrer"
+    else:
+        result = flask.make_response(flask.jsonify({"error": error}), status_code)
+    result.headers["Cache-Control"] = "no-store"
+    return result
 
 
 def app_sessions(app):
@@ -399,7 +449,9 @@ def _get_s3_bucket_credential(app, bucket_name, aws_creds, expires_in):
 
     aws_creds_config = aws_creds.get(cred_key)
     if aws_creds_config is None:
-        raise ValueError(f"aws credential {cred_key} for bucket {bucket_name} is not found")
+        raise ValueError(
+            f"aws credential {cred_key} for bucket {bucket_name} is not found"
+        )
 
     role_arn = bucket_cred.get("role-arn")
     if not role_arn:
