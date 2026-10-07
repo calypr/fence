@@ -1,30 +1,46 @@
-## Default Expiration Times in Fence
+# Default expiration times in Fence
 
-Tables contain various artifacts in fence that have temporary lifetimes and their default values.
+This page lists the default lifetimes of temporary Fence artifacts.
 
-### Tokens, Sessions, and Signed URLs
+## Tokens, sessions, and signed URLs
 
-| Name                         | Lifetime            | Extendable? | Maximum Lifetime                                              | Details                                                                                              |
-| ---------------------------- | ------------------- | ----------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Access Token                 | 20 minutes          | TRUE        | Life of the refresh token, or 8 hours for a browser session   | `ACCESS_TOKEN_EXPIRES_IN`. Issued to OIDC clients and to browser sessions                            |
-| Sliding Session Window       | 15 minutes          | TRUE        | 8 hours                                                       | `SESSION_TIMEOUT` and `SESSION_LIFETIME`. access_token cookies get generated automatically if the session is still active, when the token is missing, expired, or within `ACCESS_TOKEN_RENEWAL_THRESHOLD` seconds of expiring |
-| Refresh Token                | 30 days             | FALSE       | N/A                                                           | `REFRESH_TOKEN_EXPIRES_IN` is both the default and the max                                           |
-| API Key                      | 30 days             | FALSE       | N/A                                                           | `MAX_API_KEY_TTL`. Can optionally provide a shorter expiration                                       |
-| Access Token from an API Key | 1 hour              | TRUE        | 1 hour per token, and never past the API key's own expiration | `MAX_ACCESS_TOKEN_TTL` is both the default and the max at `/credentials/api/access_token`. A request that would outlive the API key is rejected rather than shortened |
-| Task Token                   | Per task token type | TRUE        | Per task token type                                           | `MAX_TASK_TOKEN_TTL` per type, falling back to `MAX_ACCESS_TOKEN_TTL`. No task token types are allowed by default |
-| Signed URL (AWS or Google)   | Up to 1 hour        | FALSE       | N/A                                                           | `MAX_PRESIGNED_URL_TTL`. Can optionally provide an expiration less than 1 hour                       |
+- **Access token:** 20 minutes by default (`ACCESS_TOKEN_EXPIRES_IN`). A token
+  cannot outlive its refresh token. A browser session lasts at most 8 hours.
+- **Sliding session window:** 15 minutes (`SESSION_TIMEOUT`). The session
+  lasts at most 8 hours (`SESSION_LIFETIME`). Fence creates a new access token
+  cookie when the token is missing, expired, or within
+  `ACCESS_TOKEN_RENEWAL_THRESHOLD` seconds of expiration.
+- **Refresh token:** 30 days by default and at most
+  `REFRESH_TOKEN_EXPIRES_IN`.
+- **API key:** 30 days at most (`MAX_API_KEY_TTL`). The request can specify a
+  shorter lifetime.
+- **Access token from an API key:** 1 hour by default and at most
+  `MAX_ACCESS_TOKEN_TTL` per token. Fence rejects a request that would outlive
+  the API key.
+- **Task token:** The lifetime depends on the token type. `MAX_TASK_TOKEN_TTL`
+  sets each type's limit; unspecified types use `MAX_ACCESS_TOKEN_TTL`.
+  No task token types are allowed by default.
+- **AWS or Google signed URL:** Up to 1 hour (`MAX_PRESIGNED_URL_TTL`). The
+  request can specify a shorter lifetime.
 
-### Google Account Linking and Service Accounts
+## Google account linking and service accounts
 
-> NOTE: "SA" in the below table stands for Service Account
+"SA" means service account. Google account linking and proxy group management
+are under review for deprecation. Do not build new functionality on these
+lifetimes.
 
-> NOTE: Google account linking and proxy group management are under review for
-> deprecation. Do not build new functionality on the lifetimes below.
-
-| Name                          | Lifetime   | Extendable? | Maximum Lifetime | Details                                                                                              |
-| ----------------------------- | ---------- | ----------- | ---------------- | ---------------------------------------------------------------------------------------------------- |
-| User's Google Account Linkage | Indefinite | N/A         | N/A              | The linkage itself never expires; only the Google account access below does                          |
-| User's Google Account Access  | 1 day      | TRUE        | N/A              | `GOOGLE_ACCOUNT_ACCESS_EXPIRES_IN`. After AuthN, how long we associate a Google email with the given user. Can optionally provide an expiration less than 1 day |
-| User's SA Account Access      | 7 days     | TRUE        | N/A              | `GOOGLE_USER_SERVICE_ACCOUNT_ACCESS_EXPIRES_IN`. Access to data (e.g. length it stays in the proxy group). Can optionally provide an expiration less than 7 days |
-| Client SA (for User) Key      | 10 days    | FALSE       | N/A              | Obtained by the user themselves for temp access through `/credentials/google`. Set by cirrus's `SERVICE_KEY_EXPIRATION_IN_DAYS`, not a fence config. Can optionally provide an expiration less than 10 days |
-| User Primary SA Key           | 30 days    | FALSE       | N/A              | `GOOGLE_SERVICE_ACCOUNT_KEY_FOR_URL_SIGNING_EXPIRES_IN`. Used for Google URL signing                 |
+- **Google account linkage:** Indefinite. The link itself does not expire,
+  although the Google account access does.
+- **Google account access:** 1 day (`GOOGLE_ACCOUNT_ACCESS_EXPIRES_IN`). This
+  controls how long Fence associates a Google email with a user after
+  authentication. The request can specify a shorter lifetime.
+- **User SA account access:** 7 days
+  (`GOOGLE_USER_SERVICE_ACCOUNT_ACCESS_EXPIRES_IN`). This controls how long
+  access to data remains in the proxy group. The request can specify a shorter
+  lifetime.
+- **Client SA key for a user:** 10 days. The user obtains it through
+  `/credentials/google`. Cirrus sets the lifetime with
+  `SERVICE_KEY_EXPIRATION_IN_DAYS`. The request can specify a shorter lifetime.
+- **User primary SA key:** 30 days
+  (`GOOGLE_SERVICE_ACCOUNT_KEY_FOR_URL_SIGNING_EXPIRES_IN`). Fence uses the key
+  for Google URL signing.
