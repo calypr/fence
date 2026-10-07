@@ -202,10 +202,12 @@ def test_valid_session_valid_access_token(
     user = db_session.query(User).filter_by(id=test_user_a["user_id"]).first()
     keypair = app.keypairs[0]
 
+    # without user_id the session token's "sub" is empty, and the access token below
+    # would be rejected as belonging to a different subject
     test_session_jwt = create_session_token(
         keypair,
         config.get("SESSION_TIMEOUT"),
-        context={"username": user.username, "provider": "google"},
+        context={"username": user.username, "user_id": user.id, "provider": "google"},
     )
 
     test_access_jwt = generate_signed_access_token(
@@ -241,6 +243,8 @@ def test_valid_session_valid_access_token(
         user_id = response.json.get("user_id") or response.json.get("sub")
         assert response.status_code == 200
         assert user_id == user.id
+        # the request's access token is usable and nowhere near expiring
+        assert "access_token" not in _get_cookies_from_response(response)
 
 
 def test_valid_session_valid_access_token_diff_user(
